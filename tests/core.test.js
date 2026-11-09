@@ -188,74 +188,84 @@ test('group changelog by Conventional Commits',()=>{
  const grouped=actions.groupCommits([{comment:'feat: new API',commitId:SHA1},{comment:'fix(parser): bug',commitId:SHA2},{comment:'docs: update',commitId:SHA1}]);
  assert.equal(grouped.Features.length,1);assert.equal(grouped.Fixes.length,1);assert.equal(grouped.Other.length,1);
 });
-test('GitChangelog uses Azure Repos commitsbatch POST with both typed versions',async()=>{
- const {api,calls}=fake(({url,method,body})=>{
-  assert.equal(method,'POST');
-  assert.ok(url.pathname.endsWith('/commitsbatch'));
-  assert.deepEqual(body.itemVersion,{version:'v2',versionType:'tag'});
-  assert.deepEqual(body.compareVersion,{version:'v1',versionType:'tag'});
-  assert.equal(body['$top'],50);
-  assert.equal(body['$skip'],0);
-  return {count:1,value:[{comment:'feat: clean API',commitId:SHA2}]};
+test('GitChangelog compares commits independently of REST history filter',async()=>{
+ const {api,calls}=fake(({url,method})=>{
+   if(method==='GET'&&url.pathname.endsWith('/diffs/commits'))return {aheadCount:1,behindCount:0,commonCommit:SHA1,changes:[]};
+   if(method==='GET'&&url.pathname.endsWith('/commits'))return {count:2,value:[{comment:'feat: clean API',commitId:SHA2},{comment:'old base',commitId:SHA1}]};
+   throw new Error('Unexpected REST API call');
  });
- const restore=inputs({repositoryId:'repo',commitSha:SHA1,baseVersion:'tag:v1',targetVersion:'tag:v2',maxCommits:'50',outputFile:''});
+ const restore=inputs({repositoryId:'repo',commitSha:SHA2,baseVersion:SHA1,targetVersion:SHA2,maxCommits:'50',outputFile:''});
  try {
-  const result=await actions.changelog(api);
-  assert.equal(result.count,1);
-  assert.equal(result.groups.Features[0].sha,SHA2);
-  assert.equal(calls.length,1);
+   const result=await actions.changelog(api);
+   assert.equal(result.count,1);
+   assert.equal(result.aheadCount,1);
+   assert.equal(result.isTruncated,false);
+   assert.equal(result.groups.Features[0].sha,SHA2);
+   assert.deepEqual(calls.map(x=>x.method),['GET','GET']);
+   assert.equal(calls[1].url.searchParams.get('searchCriteria.itemVersion.version'),SHA2);
+   assert.equal(calls[1].url.searchParams.get('searchCriteria.itemVersion.versionType'),'commit');
+   assert.equal(calls[1].url.searchParams.has('searchCriteria.compareVersion.version'),false);
  }finally{restore()}
 });
-test('GitChangelog produces commit notes when base is the parent of target',async()=>{
+test('GitChangelog writes parent-child commit to Markdown',async()=>{
  const os=require('node:os');
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'git-changelog-'));
  const report=path.join(tmp,'CHANGELOG.md');
- const {api,calls}=fake(({url,method,body})=>{
-  assert.equal(method,'POST');
-  assert.ok(url.pathname.endsWith('/commitsbatch'));
-  assert.equal(body.itemVersion.version,SHA2);
-  assert.equal(body.compareVersion.version,SHA1);
-  return {count:1,value:[{comment:'fix: update test pipeline',commitId:SHA2}]};
- });
+ const {api}=fake(({url})=>url.pathname.endsWith('/diffs/commits')?
+  {aheadCount:1,behindCount:0,commonCommit:SHA1}:
+  {count:1,value:[{comment:'fix: update test pipeline',commitId:SHA2}]});
  const restore=inputs({repositoryId:'repo',commitSha:SHA2,baseVersion:SHA1,targetVersion:SHA2,maxCommits:'200',outputFile:report});
  try {
-  const result=await actions.changelog(api);
-  assert.equal(result.count,1);
-  assert.equal(calls.length,1);
-  const content=fs.readFileSync(report,'utf8');
-  assert.match(content,/## Fixes/);
-  assert.match(content,/fix: update test pipeline/);
-  assert.match(content,/bbbbbbbb/);
+   const result=await actions.changelog(api);
+   assert.equal(result.count,1);
+   const content=fs.readFileSync(report,'utf8');
+   assert.match(content,/## Fixes/);
+   assert.match(content,/fix: update test pipeline/);
+   assert.match(content,/bbbbbbbb/);
  }finally{restore();fs.rmSync(tmp,{recursive:true,force:true});}
 });
-test('GitChangelog refuses empty commit list when diff says one commit ahead',async()=>{
- const {api,calls}=fake(({url,method})=>{
-  if(method==='POST'&&url.pathname.endsWith('/commitsbatch'))return {count:0,value:[]};
-  if(method==='GET'&&url.pathname.endsWith('/diffs/commits'))return {aheadCount:1,behindCount:0,changes:[]};
-  throw new Error('Unexpected API call');
- });
+test('GitChangelog does not silently generate an empty report when diff is ahead',async()=>{
+ const {api,calls}=fake(({url})=>url.pathname.endsWith('/diffs/commits')?
+   {aheadCount:1,behindCount:0}:
+   {value:[],count:0});
  const restore=inputs({repositoryId:'repo',commitSha:SHA2,baseVersion:SHA1,targetVersion:SHA2,outputFile:''});
- try {
-  await assert.rejects(()=>actions.changelog(api),/commitsbatch retornou vazio/);
-  assert.deepEqual(calls.map(x=>x.method),['POST','GET']);
+ try{
+   await assert.rejects(()=>actions.changelog(api),/esperado\(s\) 1/);
+   assert.equal(calls.length,2);
  }finally{restore()}
 });
-test('GitChangelog represents valid zero commits when target has no ahead commits',async()=>{
- const {api,calls}=fake(({url,method})=>{
-  if(method==='POST'&&url.pathname.endsWith('/commitsbatch'))return {count:0,value:[]};
-  if(method==='GET'&&url.pathname.endsWith('/diffs/commits'))return {aheadCount:0,behindCount:1,changes:[]};
-  throw new Error('Unexpected API call');
- });
+test('GitChangelog returns clear empty result when target is not ahead',async()=>{
+ const {api,calls}=fake(()=>({aheadCount:0,behindCount:1}));
  const restore=inputs({repositoryId:'repo',commitSha:SHA1,baseVersion:SHA2,targetVersion:SHA1,outputFile:''});
- try {
-  const result=await actions.changelog(api);
-  assert.equal(result.count,0);
-  assert.match(result.markdown,/Nenhum commit novo/);
-  assert.equal(calls.length,2);
+ try{
+   const result=await actions.changelog(api);
+   assert.equal(result.count,0);
+   assert.match(result.markdown,/Nenhum commit novo/);
+   assert.equal(calls.length,1);
  }finally{restore()}
 });
-test('GitChangelog fails closed for an unexpected commitsbatch response',async()=>{
- const {api}=fake(()=>({count:1}));
- const restore=inputs({repositoryId:'repo',commitSha:SHA1,baseVersion:SHA1,targetVersion:SHA2,outputFile:''});
- try {await assert.rejects(()=>actions.changelog(api),/resposta inesperada/);}finally{restore()}
+test('GitChangelog limits output to ahead commits and marks truncation',async()=>{
+ const third='c'.repeat(40);
+ const {api}=fake(({url})=>url.pathname.endsWith('/diffs/commits')?
+  {aheadCount:3,behindCount:0}:
+  {count:2,value:[{commitId:third,comment:'feat: third'},{commitId:SHA2,comment:'fix: second'}]});
+ const restore=inputs({repositoryId:'repo',commitSha:third,baseVersion:SHA1,targetVersion:third,maxCommits:'2',outputFile:''});
+ try{
+   const result=await actions.changelog(api);
+   assert.equal(result.count,2);
+   assert.equal(result.isTruncated,true);
+   assert.match(result.markdown,/2 de 3 commits/);
+ }finally{restore()}
+});
+test('GitChangelog refuses an unrelated first commit for SHA target',async()=>{
+ const {api}=fake(({url})=>url.pathname.endsWith('/diffs/commits')?
+  {aheadCount:1,behindCount:0}:
+  {count:1,value:[{commitId:SHA1,comment:'wrong history'}]});
+ const restore=inputs({repositoryId:'repo',commitSha:SHA2,baseVersion:SHA1,targetVersion:SHA2,outputFile:''});
+ try{await assert.rejects(()=>actions.changelog(api),/difere do SHA de destino/);}finally{restore()}
+});
+test('GitChangelog refuses missing aheadCount',async()=>{
+ const {api}=fake(()=>({changes:[]}));
+ const restore=inputs({repositoryId:'repo',commitSha:SHA2,baseVersion:SHA1,targetVersion:SHA2,outputFile:''});
+ try{await assert.rejects(()=>actions.changelog(api),/aheadCount válido/);}finally{restore()}
 });

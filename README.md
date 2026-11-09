@@ -116,10 +116,10 @@ Versões precisam de sintaxe explícita: `tag:NOME`, `branch:NOME`, `refs/tags/N
 - Em Classic Release, `GitCompare`, `GitVerify`, `GitChangelog` e operações de PR/merge exigem uma seleção sem ambiguidades. Use `artifactAliases` para selecionar um artefato de build por vez.
 - **Apenas artefatos de tipo Build com repository.type=TfsGit** são descobertos automaticamente na Release. Artefatos externos ou de outros projetos precisam de uma task/configuração apropriada.
 - GitTag cria **lightweight tags**, não annotated/signed tags.
-- O changelog consulta o endpoint REST `commitsbatch` com versões de origem/destino e limita o resultado a `maxCommits`; agrupa `feat:` e `fix:` e coloca os demais em Other. Uma lista vazia com commits à frente agora causa erro em vez de produzir um relatório enganoso. A paginação completa ainda não é suportada.
+- O changelog usa o indicador `aheadCount` de `diffs/commits` e consulta o histórico do destino separadamente por `GET /commits`, evitando a comparação com filtro que retornava lista vazia no Azure Repos. Limita a `maxCommits`; agrupa `feat:` e `fix:` e coloca os demais em Other. Uma lista incompleta gera erro; a paginação completa ainda não é suportada.
 - O compare limita resultados a `maxChanges` e inclui indicadores de truncamento.
 - O projeto não executa checkout, merge local nem force-push; GitMerge usa a API de Pull Requests para respeitar branch policies.
-- A versão de extensão é **0.1.1**; as tasks usam **@1** (Major=1). `GitChangelog` foi atualizado para **1.0.1**. Não publique no Marketplace antes de homologar em DEV/QAS.
+- A versão de extensão é **0.1.2**; as tasks usam **@1** (Major=1). `GitChangelog` foi atualizado para **1.0.2**. Não publique no Marketplace antes de homologar em DEV/QAS.
 
 ## Desenvolvimento e testes
 

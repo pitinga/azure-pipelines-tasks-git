@@ -94,15 +94,29 @@ async function changelog(api) {
   const base=required('baseVersion');
   const version=input('targetVersion')||target.commit;
   const limit=number('maxCommits',200,500);
-  const raw=await api.commits(target.repo,base,version,limit);
-  const commits=Array.isArray(raw)?raw:raw?.value;
-  if(!Array.isArray(commits))throw new Error('GitChangelog: resposta inesperada da API commitsbatch (value ausente ou inválido).');
-  if(!commits.length && base!==version) {
-    // An empty result is valid only when the target has no commits ahead.
-    // Without this guard the task could silently publish an empty report.
-    const diff=await api.diff(target.repo,base,version,1);
-    if(!Number.isFinite(diff.aheadCount))throw new Error('GitChangelog: não foi possível validar a comparação de commits (aheadCount ausente).');
-    if(diff.aheadCount>0)throw new Error('GitChangelog: a comparação indica '+diff.aheadCount+' commit(s) novo(s), mas commitsbatch retornou vazio. Relatório não gerado.');
+  // The previous commitsbatch compareVersion query returned no commits
+  // for valid parent -> child pairs in Azure Repos. Use the validated diff
+  // aheadCount and request target history independently instead.
+  const diff=await api.diff(target.repo,base,version,1);
+  const ahead=diff?.aheadCount;
+  if(!Number.isSafeInteger(ahead)||ahead<0)throw new Error('GitChangelog: comparação não retornou aheadCount válido.');
+  const requested=Math.min(limit,ahead);
+  let commits=[];
+  if(requested>0) {
+    const raw=await api.commits(target.repo,version,requested);
+    const fetched=Array.isArray(raw)?raw:raw?.value;
+    if(!Array.isArray(fetched)||fetched.length<requested) {
+      throw new Error('GitChangelog: histórico retornou '+(Array.isArray(fetched)?fetched.length:'dados inválidos')+' commit(s), esperado(s) '+requested+'. Relatório não gerado.');
+    }
+    commits=fetched.slice(0,requested);
+    if(commits.some(c=>!sha(c.commitId))) {
+      throw new Error('GitChangelog: histórico contém commitId ausente ou inválido.');
+    }
+    // For explicit SHA targets, the first item must be the exact target,
+    // not a stale branch HEAD or a different part of the history.
+    if(sha(version)&&commits[0].commitId.toLowerCase()!==version.toLowerCase()) {
+      throw new Error('GitChangelog: o primeiro commit retornado difere do SHA de destino.');
+    }
   }
   const groups=groupCommits(commits);
   const lines=['# Changelog','','**Base:** '+base+'  ','**Target:** '+version,''];
@@ -110,14 +124,15 @@ async function changelog(api) {
   for(const [group,items] of Object.entries(groups)) {
     if(!items.length)continue;
     lines.push('## '+group,'');
-    for(const c of items) lines.push('- '+c.message+' ('+(c.sha?c.sha.slice(0,8):'no SHA')+')');
+    for(const c of items)lines.push('- '+c.message+' ('+(c.sha?c.sha.slice(0,8):'no SHA')+')');
     lines.push('');
   }
-  if(commits.length===limit)lines.push('> Resultado limitado aos primeiros '+limit+' commits.','','');
+  if(ahead>commits.length)lines.push('> Resultado limitado aos primeiros '+commits.length+' de '+ahead+' commits à frente.','','');
   const md=lines.join('\n')+'\n';
   save(input('outputFile'),md);
   variable('GitChangelogCount',commits.length);
-  return output('GitChangelog',{base,target:version,count:commits.length,groups,markdown:input('outputFile')?'saved':md});
+  return output('GitChangelog',{base,target:version,count:commits.length,aheadCount:ahead,
+    isTruncated:ahead>commits.length,groups,markdown:input('outputFile')?'saved':md});
 }
 async function status(api) {
   const target=await one(api,opts());

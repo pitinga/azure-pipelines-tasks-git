@@ -95,16 +95,16 @@ class AzureClient {
        diffCommonCommit:'false','$top':String(max),'$skip':'0'}
     });
   }
-  async commits(repo,base,target,max) {
-    const [b,t]=[require('./runtime').versionInput(base),require('./runtime').versionInput(target)];
-    // Azure Repos 7.1: commitsbatch is the documented endpoint for
-    // enumerating commits reachable from target but not from base.
-    return this.request('POST',this.git(repo)+'/commitsbatch',{
-      body:{
-        itemVersion:{version:t.version,versionType:t.versionType},
-        compareVersion:{version:b.version,versionType:b.versionType},
-        '$top':max,
-        '$skip':0
+  async commits(repo,target,max) {
+    // Query only target history. Azure Repos accepts a SHA, tag or branch as
+    // itemVersion; comparisons are independently validated via diffs/commits.
+    const t=require('./runtime').versionInput(target);
+    return this.request('GET',this.git(repo)+'/commits',{
+      query:{
+        'searchCriteria.itemVersion.version':t.version,
+        'searchCriteria.itemVersion.versionType':t.versionType,
+        'searchCriteria.$top':String(max),
+        'searchCriteria.$skip':'0'
       }
     });
   }
