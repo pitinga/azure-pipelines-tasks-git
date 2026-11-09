@@ -16,7 +16,7 @@ function fake(fn) {
       const record={url:new URL(url),method:init.method,body:init.body?JSON.parse(init.body):null};
       calls.push(record);
       const result=await fn(record);
-      const status=result?.status||200;
+      const status=typeof result?.status==='number' ? result.status : 200;
       return {ok:status>=200&&status<300,status,text:async()=>JSON.stringify(result?.body??result??{})};
    }});
  return {api,calls};
