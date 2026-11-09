@@ -1,0 +1,103 @@
+{
+  "id": "8d52d722-a311-449d-a2b3-7a12dd96a106",
+  "name": "GitCommitStatus",
+  "friendlyName": "Publicar Status Git",
+  "description": "Registra o status de implantação ou validação em um commit Azure Repos.",
+  "helpMarkDown": "Azure Repos Git; suporta CI e Classic Release. Requer SYSTEM_ACCESSTOKEN e agente >= 4.265.1.",
+  "category": "Utility",
+  "visibility": [
+    "Build",
+    "Release"
+  ],
+  "author": "Pitinga",
+  "version": {
+    "Major": 1,
+    "Minor": 0,
+    "Patch": 0
+  },
+  "minimumAgentVersion": "4.265.1",
+  "instanceNameFormat": "Publicar Status Git",
+  "execution": {
+    "Node24": {
+      "target": "index.js"
+    }
+  },
+  "inputs": [
+    {
+      "name": "repositoryId",
+      "type": "string",
+      "label": "Repository ID Azure Repos (opcional)",
+      "required": false,
+      "helpMarkDown": "Se preenchido, informe também commitSha. Caso contrário usa build ou artefatos de Classic Release."
+    },
+    {
+      "name": "commitSha",
+      "type": "string",
+      "label": "Commit SHA manual (opcional)",
+      "required": false,
+      "helpMarkDown": "SHA Git de 40 caracteres; use em conjunto com repositoryId."
+    },
+    {
+      "name": "artifactAliases",
+      "type": "multiLine",
+      "label": "Aliases de artefatos Classic Release (opcional)",
+      "required": false,
+      "helpMarkDown": "Lista de aliases separados por vírgula, ponto e vírgula ou nova linha. Vazio seleciona todos os artefatos Build/Azure Repos Git; vários commits do mesmo repo devem ser desambiguados."
+    },
+    {
+      "name": "statusName",
+      "type": "string",
+      "label": "Nome do contexto de status",
+      "required": true,
+      "defaultValue": "",
+      "helpMarkDown": ""
+    },
+    {
+      "name": "state",
+      "type": "pickList",
+      "label": "Estado",
+      "required": false,
+      "defaultValue": "succeeded",
+      "helpMarkDown": "",
+      "options": {
+        "succeeded": "succeeded",
+        "failed": "failed",
+        "pending": "pending",
+        "error": "error",
+        "notApplicable": "notApplicable"
+      }
+    },
+    {
+      "name": "statusGenre",
+      "type": "string",
+      "label": "Categoria",
+      "required": false,
+      "defaultValue": "deployment",
+      "helpMarkDown": ""
+    },
+    {
+      "name": "description",
+      "type": "string",
+      "label": "Descrição do status",
+      "required": false,
+      "defaultValue": "Git Tasks for Azure Pipelines",
+      "helpMarkDown": ""
+    },
+    {
+      "name": "targetUrl",
+      "type": "string",
+      "label": "URL para informações do status (HTTPS)",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": ""
+    },
+    {
+      "name": "dryRun",
+      "type": "boolean",
+      "label": "Simular sem gravar",
+      "required": false,
+      "defaultValue": "false",
+      "helpMarkDown": ""
+    }
+  ]
+}

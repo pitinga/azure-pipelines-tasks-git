@@ -1,0 +1,88 @@
+{
+  "id": "8d52d722-a311-449d-a2b3-7a12dd96a101",
+  "name": "GitTag",
+  "friendlyName": "Criar Tag Git",
+  "description": "Cria tags imutáveis nos commits de artefatos de Classic Release ou de um build.",
+  "helpMarkDown": "Azure Repos Git; suporta CI e Classic Release. Requer SYSTEM_ACCESSTOKEN e agente >= 4.265.1.",
+  "category": "Utility",
+  "visibility": [
+    "Build",
+    "Release"
+  ],
+  "author": "Pitinga",
+  "version": {
+    "Major": 1,
+    "Minor": 0,
+    "Patch": 0
+  },
+  "minimumAgentVersion": "4.265.1",
+  "instanceNameFormat": "Criar Tag Git",
+  "execution": {
+    "Node24": {
+      "target": "index.js"
+    }
+  },
+  "inputs": [
+    {
+      "name": "repositoryId",
+      "type": "string",
+      "label": "Repository ID Azure Repos (opcional)",
+      "required": false,
+      "helpMarkDown": "Se preenchido, informe também commitSha. Caso contrário usa build ou artefatos de Classic Release."
+    },
+    {
+      "name": "commitSha",
+      "type": "string",
+      "label": "Commit SHA manual (opcional)",
+      "required": false,
+      "helpMarkDown": "SHA Git de 40 caracteres; use em conjunto com repositoryId."
+    },
+    {
+      "name": "artifactAliases",
+      "type": "multiLine",
+      "label": "Aliases de artefatos Classic Release (opcional)",
+      "required": false,
+      "helpMarkDown": "Lista de aliases separados por vírgula, ponto e vírgula ou nova linha. Vazio seleciona todos os artefatos Build/Azure Repos Git; vários commits do mesmo repo devem ser desambiguados."
+    },
+    {
+      "name": "tagName",
+      "type": "string",
+      "label": "Nome da tag (vazio: nome da release)",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Ex.: v1.2.3. Sem nome usa Release.ReleaseName ou Build.BuildNumber."
+    },
+    {
+      "name": "searchRegex",
+      "type": "string",
+      "label": "Expressão regular opcional",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": ""
+    },
+    {
+      "name": "regexFlags",
+      "type": "string",
+      "label": "Flags regex",
+      "required": false,
+      "defaultValue": "g",
+      "helpMarkDown": ""
+    },
+    {
+      "name": "replacePattern",
+      "type": "string",
+      "label": "Padrão de substituição",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": ""
+    },
+    {
+      "name": "dryRun",
+      "type": "boolean",
+      "label": "Simular sem gravar",
+      "required": false,
+      "defaultValue": "false",
+      "helpMarkDown": ""
+    }
+  ]
+}

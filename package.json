@@ -1,0 +1,15 @@
+{
+  "name": "azure-pipelines-tasks-git",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Eight Azure Repos Git pipeline tasks; Node 24 only",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "build": "node scripts/build.js",
+    "package:vsix": "npm run build && tfx extension create --manifest-globs vss-extension.json --output-path dist"
+  }
+}

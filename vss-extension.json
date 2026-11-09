@@ -1,0 +1,167 @@
+{
+  "manifestVersion": 1,
+  "id": "azure-pipelines-tasks-git",
+  "publisher": "pitinga",
+  "name": "Git Tasks for Azure Pipelines",
+  "version": "0.1.0",
+  "description": "Node.js 24 tasks for Git tags, branches, comparison, changelogs, verification, commit statuses, pull requests and protected merges in Azure Repos.",
+  "public": false,
+  "targets": [
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
+  "categories": [
+    "Azure Pipelines"
+  ],
+  "tags": [
+    "git",
+    "Azure Repos",
+    "Node 24",
+    "tag",
+    "branch",
+    "compare",
+    "changelog",
+    "merge",
+    "pull request"
+  ],
+  "icons": {
+    "default": "images/extension-icon.png"
+  },
+  "content": {
+    "details": {
+      "path": "overview.md"
+    },
+    "license": {
+      "path": "LICENSE"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "uri": "https://github.com/pitinga/azure-pipelines-tasks-git"
+  },
+  "links": {
+    "support": {
+      "uri": "https://github.com/pitinga/azure-pipelines-tasks-git/issues"
+    },
+    "repository": {
+      "uri": "https://github.com/pitinga/azure-pipelines-tasks-git"
+    }
+  },
+  "files": [
+    {
+      "path": "build/GitTag",
+      "packagePath": "GitTag"
+    },
+    {
+      "path": "build/GitBranch",
+      "packagePath": "GitBranch"
+    },
+    {
+      "path": "build/GitCompare",
+      "packagePath": "GitCompare"
+    },
+    {
+      "path": "build/GitChangelog",
+      "packagePath": "GitChangelog"
+    },
+    {
+      "path": "build/GitVerify",
+      "packagePath": "GitVerify"
+    },
+    {
+      "path": "build/GitCommitStatus",
+      "packagePath": "GitCommitStatus"
+    },
+    {
+      "path": "build/GitPullRequest",
+      "packagePath": "GitPullRequest"
+    },
+    {
+      "path": "build/GitMerge",
+      "packagePath": "GitMerge"
+    }
+  ],
+  "contributions": [
+    {
+      "id": "git-tag",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "GitTag"
+      }
+    },
+    {
+      "id": "git-branch",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "GitBranch"
+      }
+    },
+    {
+      "id": "git-compare",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "GitCompare"
+      }
+    },
+    {
+      "id": "git-changelog",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "GitChangelog"
+      }
+    },
+    {
+      "id": "git-verify",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "GitVerify"
+      }
+    },
+    {
+      "id": "git-commit-status",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "GitCommitStatus"
+      }
+    },
+    {
+      "id": "git-pull-request",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "GitPullRequest"
+      }
+    },
+    {
+      "id": "git-merge",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "GitMerge"
+      }
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+name: Validate and package Git Tasks VSIX
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Node 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify Node 24
+        run: node -e "if (process.versions.node.split('.')[0] !== '24') process.exit(1); console.log(process.version)"
+      - name: Test
+        run: npm test
+      - name: Build 8 tasks
+        run: npm run build
+      - name: Package VSIX
+        run: npx --yes tfx-cli@0.24.2 extension create --manifest-globs vss-extension.json --output-path dist
+      - name: Verify VSIX
+        run: |
+          python3 - <<'PY'
+          import glob, json, zipfile
+          files=glob.glob('dist/*.vsix')
+          assert len(files)==1, files
+          with zipfile.ZipFile(files[0]) as z:
+              names=set(z.namelist())
+              assert 'extension.vsixmanifest' in names
+              assert 'extension.vsomanifest' in names
+              for task in ('GitTag','GitBranch','GitCompare','GitChangelog','GitVerify','GitCommitStatus','GitPullRequest','GitMerge'):
+                  assert task+'/task.json' in names,task
+                  assert task+'/index.js' in names,task
+                  assert task+'/actions.js' in names,task
+                  assert task+'/icon.png' in names,task
+                  item=json.loads(z.read(task+'/task.json'))
+                  assert list(item['execution'])==['Node24'],task
+                  assert item['minimumAgentVersion']=='4.265.1',task
+              assets=z.read('extension.vsixmanifest').decode()
+              assert 'Microsoft.VisualStudio.Services.Icons.Default' in assets
+              assert 'Microsoft.VisualStudio.Services.Content.Details' in assets
+              assert 'Microsoft.VisualStudio.Services.Content.License' in assets
+          print('Verified 8 Node24 tasks in',files[0])
+          PY
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: git-tasks-vsix
+          path: dist/*.vsix
+          if-no-files-found: error
