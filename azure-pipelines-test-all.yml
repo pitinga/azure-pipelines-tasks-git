@@ -1,0 +1,224 @@
+# Pipeline E2E das 8 Git Tasks, para Azure DevOps (repositorio TESTE).
+# Executa escrita apenas com allowTestWrites=true. Nenhum merge real e realizado.
+# Requer VSIX da extensao instalado. Teste com repositorio Azure Repos
+# no MESMO projeto do pipeline; sourceCommitSha deve ser posterior a baseCommitSha.
+trigger: none
+pr: none
+name: git-tasks-e2e-$(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+- name: testRepositoryId
+  displayName: 'Repository ID (GUID) do Azure Repos de testes'
+  type: string
+  default: ''
+- name: baseCommitSha
+  displayName: 'Commit base (SHA de 40 caracteres)'
+  type: string
+  default: ''
+- name: sourceCommitSha
+  displayName: 'Commit de origem (descendente do base)'
+  type: string
+  default: ''
+- name: allowTestWrites
+  displayName: 'AUTORIZO criar tag, branches, status e PR draft no repositorio de testes'
+  type: boolean
+  default: false
+
+pool:
+  name: managed-agent-pool-linux
+
+variables:
+  testTag: 'git-tasks-e2e/$(Build.BuildId)'
+  testSourceBranch: 'git-tasks-e2e/$(Build.BuildId)/source'
+  testTargetBranch: 'git-tasks-e2e/$(Build.BuildId)/target'
+  testStatusName: 'git-tasks-e2e-$(Build.BuildId)'
+
+jobs:
+- job: TestAllGitTasks
+  displayName: 'E2E | Todas as oito Git Tasks'
+  timeoutInMinutes: 30
+  steps:
+  - checkout: none
+
+  - pwsh: |
+      $ErrorActionPreference = 'Stop'
+      if ('${{ parameters.allowTestWrites }}' -ne 'True') {
+        throw 'Execucao bloqueada. Confirme allowTestWrites=true e use um repositorio Azure Repos exclusivo para testes.'
+      }
+      $repo = '${{ parameters.testRepositoryId }}'
+      $base = '${{ parameters.baseCommitSha }}'
+      $source = '${{ parameters.sourceCommitSha }}'
+      if ($repo -notmatch '^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$') {
+        throw 'testRepositoryId deve ser um GUID valido no mesmo projeto do pipeline.'
+      }
+      if ($base -notmatch '^[a-fA-F0-9]{40}$' -or $source -notmatch '^[a-fA-F0-9]{40}$') {
+        throw 'Os dois commits devem possuir 40 caracteres hexadecimais.'
+      }
+      if ($base -eq $source) {
+        throw 'baseCommitSha e sourceCommitSha nao podem ser iguais.'
+      }
+      if (-not $env:SYSTEM_ACCESSTOKEN) {
+        throw 'System.AccessToken nao disponivel. Verifique acesso OAuth do agente.'
+      }
+      Write-Host "Repositorio de testes: $repo"
+      Write-Host "Base: $base; Source: $source"
+      Write-Host "Tag: $(testTag)"
+      Write-Host "Source: $(testSourceBranch)"
+      Write-Host "Target: $(testTargetBranch)"
+      Write-Host 'ATENCAO: criara referencias e um PR draft remoto, mas NUNCA fara merge.'
+    displayName: '00 | Validar permissao explicita, parametros e token'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitTag@1
+    displayName: '01 | Dry run da tag'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.sourceCommitSha }}'
+      tagName: '$(testTag)'
+      dryRun: 'true'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitTag@1
+    displayName: '02 | Criar tag de teste'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.sourceCommitSha }}'
+      tagName: '$(testTag)'
+      dryRun: 'false'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitTag@1
+    displayName: '03 | Idempotência da tag'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.sourceCommitSha }}'
+      tagName: '$(testTag)'
+      dryRun: 'false'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitVerify@1
+    displayName: '04 | Validar tag e SHA'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.sourceCommitSha }}'
+      refName: '$(testTag)'
+      refType: 'tag'
+      expectedSha: '${{ parameters.sourceCommitSha }}'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitBranch@1
+    displayName: '05 | Criar branch de origem'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.sourceCommitSha }}'
+      branchName: '$(testSourceBranch)'
+      dryRun: 'false'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitBranch@1
+    displayName: '06 | Criar branch de destino'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.baseCommitSha }}'
+      branchName: '$(testTargetBranch)'
+      dryRun: 'false'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitVerify@1
+    displayName: '07 | Validar branch de origem'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.sourceCommitSha }}'
+      refName: '$(testSourceBranch)'
+      refType: 'branch'
+      expectedSha: '${{ parameters.sourceCommitSha }}'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitCompare@1
+    displayName: '08 | Comparar versões'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.sourceCommitSha }}'
+      baseVersion: '${{ parameters.baseCommitSha }}'
+      targetVersion: '${{ parameters.sourceCommitSha }}'
+      format: 'markdown'
+      maxChanges: '200'
+      outputFile: '$(Build.ArtifactStagingDirectory)/GitCompare.md'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitChangelog@1
+    displayName: '09 | Gerar changelog'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.sourceCommitSha }}'
+      baseVersion: '${{ parameters.baseCommitSha }}'
+      targetVersion: '${{ parameters.sourceCommitSha }}'
+      maxCommits: '200'
+      outputFile: '$(Build.ArtifactStagingDirectory)/CHANGELOG.md'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitCommitStatus@1
+    displayName: '10 | Registrar status no commit'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.sourceCommitSha }}'
+      statusName: '$(testStatusName)'
+      statusGenre: 'validation'
+      state: 'succeeded'
+      description: 'Git Tasks E2E $(Build.BuildId)'
+      dryRun: 'false'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitPullRequest@1
+    displayName: '11 | Criar PR draft de teste'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.sourceCommitSha }}'
+      sourceBranch: '$(testSourceBranch)'
+      targetBranch: '$(testTargetBranch)'
+      title: '[TESTE] Git Tasks E2E $(Build.BuildId)'
+      description: 'PR draft criado para validar GitPullRequest e GitMerge. Nao concluir merge. Limpeza manual apos homologacao.'
+      draft: 'true'
+      dryRun: 'false'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: GitMerge@1
+    displayName: '12 | Simular merge, sem alterar branch'
+    inputs:
+      repositoryId: '${{ parameters.testRepositoryId }}'
+      commitSha: '${{ parameters.sourceCommitSha }}'
+      sourceBranch: '$(testSourceBranch)'
+      targetBranch: '$(testTargetBranch)'
+      mergeStrategy: 'noFastForward'
+      confirmMerge: 'false'
+      dryRun: 'true'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: PublishPipelineArtifact@1
+    displayName: '13 | Publicar GitCompare e CHANGELOG'
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'git-tasks-e2e-$(Build.BuildId)'
+      publishLocation: 'pipeline'
+
+  - pwsh: |
+      Write-Host 'Todos os 8 tipos de Git Tasks foram executados.'
+      Write-Host 'GitMerge foi apenas simulado, com dryRun=true e confirmMerge=false.'
+      Write-Host 'LIMPEZA MANUAL: abandonar PR draft e excluir a tag e ambas as branches de teste.'
+      Write-Host 'Tag: $(testTag)'
+      Write-Host 'Branches: $(testSourceBranch), $(testTargetBranch)'
+    displayName: '14 | Resumo da homologacao'
