@@ -17,6 +17,7 @@ test('Every task contributes to Marketplace and is Node24 only',()=>{
  const manifest=require('../vss-extension.json');
  const names=manifest.contributions.map(x=>x.properties.name);
  assert.equal(new Set(names).size,8);
+ assert.deepEqual(manifest.files.map(x=>x.path),names);
  for(const name of names) {
    const task=require('../tasks/'+name+'/task.json');
    assert.deepEqual(Object.keys(task.execution),['Node24']);

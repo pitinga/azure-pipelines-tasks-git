@@ -1,5 +1,13 @@
 node_modules/
 build/
+/GitTag/
+/GitBranch/
+/GitCompare/
+/GitChangelog/
+/GitVerify/
+/GitCommitStatus/
+/GitPullRequest/
+/GitMerge/
 dist/
 images/extension-icon.png
 *.vsix

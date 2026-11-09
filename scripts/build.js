@@ -40,7 +40,7 @@ const png=icon();
 fs.mkdirSync(path.join(root,'images'),{recursive:true});
 fs.writeFileSync(path.join(root,'images','extension-icon.png'),png);
 for(const task of taskNames) {
-  const out=path.join(root,'build',task);
+  const out=path.join(root,task);
   fs.rmSync(out,{recursive:true,force:true});fs.mkdirSync(out,{recursive:true});
   const source=path.join(root,'tasks',task);
   for(const file of ['task.json','index.js'])fs.copyFileSync(path.join(source,file),path.join(out,file));

@@ -50,36 +50,28 @@
   },
   "files": [
     {
-      "path": "build/GitTag",
-      "packagePath": "GitTag"
+      "path": "GitTag"
     },
     {
-      "path": "build/GitBranch",
-      "packagePath": "GitBranch"
+      "path": "GitBranch"
     },
     {
-      "path": "build/GitCompare",
-      "packagePath": "GitCompare"
+      "path": "GitCompare"
     },
     {
-      "path": "build/GitChangelog",
-      "packagePath": "GitChangelog"
+      "path": "GitChangelog"
     },
     {
-      "path": "build/GitVerify",
-      "packagePath": "GitVerify"
+      "path": "GitVerify"
     },
     {
-      "path": "build/GitCommitStatus",
-      "packagePath": "GitCommitStatus"
+      "path": "GitCommitStatus"
     },
     {
-      "path": "build/GitPullRequest",
-      "packagePath": "GitPullRequest"
+      "path": "GitPullRequest"
     },
     {
-      "path": "build/GitMerge",
-      "packagePath": "GitMerge"
+      "path": "GitMerge"
     }
   ],
   "contributions": [
