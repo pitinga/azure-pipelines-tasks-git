@@ -1,6 +1,6 @@
 {
   "name": "azure-pipelines-tasks-git",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Eight Azure Repos Git pipeline tasks; Node 24 only",
   "license": "MIT",

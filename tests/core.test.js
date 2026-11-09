@@ -188,11 +188,74 @@ test('group changelog by Conventional Commits',()=>{
  const grouped=actions.groupCommits([{comment:'feat: new API',commitId:SHA1},{comment:'fix(parser): bug',commitId:SHA2},{comment:'docs: update',commitId:SHA1}]);
  assert.equal(grouped.Features.length,1);assert.equal(grouped.Fixes.length,1);assert.equal(grouped.Other.length,1);
 });
-test('Git Changelog fetches commit comparison with explicit versions',async()=>{
- const {api,calls}=fake(()=>({value:[{comment:'feat: clean API',commitId:SHA2}]}));
+test('GitChangelog uses Azure Repos commitsbatch POST with both typed versions',async()=>{
+ const {api,calls}=fake(({url,method,body})=>{
+  assert.equal(method,'POST');
+  assert.ok(url.pathname.endsWith('/commitsbatch'));
+  assert.deepEqual(body.itemVersion,{version:'v2',versionType:'tag'});
+  assert.deepEqual(body.compareVersion,{version:'v1',versionType:'tag'});
+  assert.equal(body['$top'],50);
+  assert.equal(body['$skip'],0);
+  return {count:1,value:[{comment:'feat: clean API',commitId:SHA2}]};
+ });
  const restore=inputs({repositoryId:'repo',commitSha:SHA1,baseVersion:'tag:v1',targetVersion:'tag:v2',maxCommits:'50',outputFile:''});
  try {
-   const result=await actions.changelog(api);assert.equal(result.count,1);
-   assert.equal(calls[0].url.searchParams.get('searchCriteria.compareVersion.versionType'),'tag');
- } finally {restore()}
+  const result=await actions.changelog(api);
+  assert.equal(result.count,1);
+  assert.equal(result.groups.Features[0].sha,SHA2);
+  assert.equal(calls.length,1);
+ }finally{restore()}
+});
+test('GitChangelog produces commit notes when base is the parent of target',async()=>{
+ const os=require('node:os');
+ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'git-changelog-'));
+ const report=path.join(tmp,'CHANGELOG.md');
+ const {api,calls}=fake(({url,method,body})=>{
+  assert.equal(method,'POST');
+  assert.ok(url.pathname.endsWith('/commitsbatch'));
+  assert.equal(body.itemVersion.version,SHA2);
+  assert.equal(body.compareVersion.version,SHA1);
+  return {count:1,value:[{comment:'fix: update test pipeline',commitId:SHA2}]};
+ });
+ const restore=inputs({repositoryId:'repo',commitSha:SHA2,baseVersion:SHA1,targetVersion:SHA2,maxCommits:'200',outputFile:report});
+ try {
+  const result=await actions.changelog(api);
+  assert.equal(result.count,1);
+  assert.equal(calls.length,1);
+  const content=fs.readFileSync(report,'utf8');
+  assert.match(content,/## Fixes/);
+  assert.match(content,/fix: update test pipeline/);
+  assert.match(content,/bbbbbbbb/);
+ }finally{restore();fs.rmSync(tmp,{recursive:true,force:true});}
+});
+test('GitChangelog refuses empty commit list when diff says one commit ahead',async()=>{
+ const {api,calls}=fake(({url,method})=>{
+  if(method==='POST'&&url.pathname.endsWith('/commitsbatch'))return {count:0,value:[]};
+  if(method==='GET'&&url.pathname.endsWith('/diffs/commits'))return {aheadCount:1,behindCount:0,changes:[]};
+  throw new Error('Unexpected API call');
+ });
+ const restore=inputs({repositoryId:'repo',commitSha:SHA2,baseVersion:SHA1,targetVersion:SHA2,outputFile:''});
+ try {
+  await assert.rejects(()=>actions.changelog(api),/commitsbatch retornou vazio/);
+  assert.deepEqual(calls.map(x=>x.method),['POST','GET']);
+ }finally{restore()}
+});
+test('GitChangelog represents valid zero commits when target has no ahead commits',async()=>{
+ const {api,calls}=fake(({url,method})=>{
+  if(method==='POST'&&url.pathname.endsWith('/commitsbatch'))return {count:0,value:[]};
+  if(method==='GET'&&url.pathname.endsWith('/diffs/commits'))return {aheadCount:0,behindCount:1,changes:[]};
+  throw new Error('Unexpected API call');
+ });
+ const restore=inputs({repositoryId:'repo',commitSha:SHA1,baseVersion:SHA2,targetVersion:SHA1,outputFile:''});
+ try {
+  const result=await actions.changelog(api);
+  assert.equal(result.count,0);
+  assert.match(result.markdown,/Nenhum commit novo/);
+  assert.equal(calls.length,2);
+ }finally{restore()}
+});
+test('GitChangelog fails closed for an unexpected commitsbatch response',async()=>{
+ const {api}=fake(()=>({count:1}));
+ const restore=inputs({repositoryId:'repo',commitSha:SHA1,baseVersion:SHA1,targetVersion:SHA2,outputFile:''});
+ try {await assert.rejects(()=>actions.changelog(api),/resposta inesperada/);}finally{restore()}
 });

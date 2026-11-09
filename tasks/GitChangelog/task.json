@@ -3,7 +3,7 @@
   "name": "GitChangelog",
   "friendlyName": "Gerar Changelog Git",
   "description": "Gera notas de versão a partir de commits entre duas referências.",
-  "helpMarkDown": "Azure Repos Git; suporta CI e Classic Release. Requer SYSTEM_ACCESSTOKEN e agente >= 4.265.1.",
+  "helpMarkDown": "Azure Repos Git; suporta CI e Classic Release. Autenticação por token OAuth do job (automática quando disponível). Agente >= 4.265.1.",
   "category": "Utility",
   "visibility": [
     "Build",
@@ -13,7 +13,7 @@
   "version": {
     "Major": 1,
     "Minor": 0,
-    "Patch": 0
+    "Patch": 1
   },
   "minimumAgentVersion": "4.265.1",
   "instanceNameFormat": "Gerar Changelog Git",

@@ -95,9 +95,18 @@ async function changelog(api) {
   const version=input('targetVersion')||target.commit;
   const limit=number('maxCommits',200,500);
   const raw=await api.commits(target.repo,base,version,limit);
-  const commits=Array.isArray(raw)?raw:(raw.value||[]);
+  const commits=Array.isArray(raw)?raw:raw?.value;
+  if(!Array.isArray(commits))throw new Error('GitChangelog: resposta inesperada da API commitsbatch (value ausente ou inválido).');
+  if(!commits.length && base!==version) {
+    // An empty result is valid only when the target has no commits ahead.
+    // Without this guard the task could silently publish an empty report.
+    const diff=await api.diff(target.repo,base,version,1);
+    if(!Number.isFinite(diff.aheadCount))throw new Error('GitChangelog: não foi possível validar a comparação de commits (aheadCount ausente).');
+    if(diff.aheadCount>0)throw new Error('GitChangelog: a comparação indica '+diff.aheadCount+' commit(s) novo(s), mas commitsbatch retornou vazio. Relatório não gerado.');
+  }
   const groups=groupCommits(commits);
   const lines=['# Changelog','','**Base:** '+base+'  ','**Target:** '+version,''];
+  if(!commits.length)lines.push('_Nenhum commit novo entre as versões._','');
   for(const [group,items] of Object.entries(groups)) {
     if(!items.length)continue;
     lines.push('## '+group,'');
