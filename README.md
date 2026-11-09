@@ -13,13 +13,6 @@ Extensão Azure DevOps com 8 tasks Azure Repos Git, **Node.js 24 exclusivamente*
 | `GitPullRequest@1` | PR automático sem duplicar existente | `sourceBranch`, `targetBranch`, `title`, `draft`, `reviewers` |
 | `GitMerge@1` | Conclusão explícita de PR ativo | `sourceBranch`, `targetBranch`, `mergeStrategy`, `confirmMerge` |
 
-## Teste completo no Azure DevOps
-
-Arquivo [azure-pipelines-test-all.yml](azure-pipelines-test-all.yml): pipeline manual para **testar as oito tasks** no próprio repositório Azure Repos de exemplo, na branch `develop`. Cria tags/branches, um status e um PR draft de teste; `GitMerge` executa somente `dryRun` e não realiza merge.
-
-O repositório e os SHAs são detectados automaticamente; somente `allowTestWrites` precisa ser confirmado. **Copie o YAML para a branch `develop` do repositório Azure Repos de exemplo e cadastre a pipeline apontando para ele.**
-
-**Segurança:** `allowTestWrites` inicia como `false`, impedindo modificações sem autorização explícita. Consulte [as instruções de integração](docs/TESTE-INTEGRACAO.md) para configurar repositório de teste, commits e permissões.
 ## Requisitos
 
 - Azure DevOps Services e repositórios **Azure Repos Git** (não GitHub/TFVC).
