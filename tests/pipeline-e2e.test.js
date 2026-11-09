@@ -14,6 +14,7 @@ test('E2E is manual, uses no checkout, and requires explicit write consent',()=>
  assert.match(yml,/checkout: none/);
  assert.match(yml,/name: allowTestWrites/);
  assert.match(yml,/allowTestWrites.*\}\}/);
+ assert.match(yml,/default: false/);
  assert.match(yml,/SYSTEM_ACCESSTOKEN: \$\(System.AccessToken\)/);
 });
 test('GitMerge is only used in safe mode',()=>{
@@ -25,10 +26,15 @@ test('GitMerge is only used in safe mode',()=>{
  assert.match(merge,/confirmMerge: 'false'/);
  assert.doesNotMatch(merge,/dryRun: 'false'/);
 });
-test('E2E uses explicit repo/SHAs and publishes reports',()=>{
- assert.match(yml,/name: testRepositoryId/);
- assert.match(yml,/name: baseCommitSha/);
- assert.match(yml,/name: sourceCommitSha/);
+test('E2E discovers repository and parent SHA on develop without input parameters',()=>{
+ assert.doesNotMatch(yml,/name: testRepositoryId|name: baseCommitSha|name: sourceCommitSha/);
+ assert.match(yml,/BUILD_REPOSITORY_PROVIDER/);
+ assert.match(yml,/BUILD_SOURCEBRANCH -ne 'refs\/heads\/develop'/);
+ assert.match(yml,/BUILD_SOURCEVERSION/);
+ assert.match(yml,/git\/repositories\/\$repo\/commits/);
+ assert.match(yml,/task.setvariable variable=E2EBaseSha/);
+ assert.match(yml,/repositoryId: '\$\(Build.Repository.ID\)'/);
+ assert.match(yml,/commitSha: '\$\(E2EBaseSha\)'/);
  assert.match(yml,/git-tasks-e2e\/\$\(Build.BuildId\)/);
  assert.match(yml,/GitCompare\.md/);
  assert.match(yml,/CHANGELOG\.md/);

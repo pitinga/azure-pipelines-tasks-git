@@ -1,26 +1,14 @@
 # Pipeline E2E das 8 Git Tasks, para Azure DevOps (repositorio TESTE).
 # Executa escrita apenas com allowTestWrites=true. Nenhum merge real e realizado.
 # Requer VSIX da extensao instalado. Teste com repositorio Azure Repos
-# no MESMO projeto do pipeline; sourceCommitSha deve ser posterior a baseCommitSha.
+# no MESMO projeto do pipeline. Execute o YAML no Azure Repos develop.
 trigger: none
 pr: none
 name: git-tasks-e2e-$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
-- name: testRepositoryId
-  displayName: 'Repository ID (GUID) do Azure Repos de testes'
-  type: string
-  default: ''
-- name: baseCommitSha
-  displayName: 'Commit base (SHA de 40 caracteres)'
-  type: string
-  default: ''
-- name: sourceCommitSha
-  displayName: 'Commit de origem (descendente do base)'
-  type: string
-  default: ''
 - name: allowTestWrites
-  displayName: 'AUTORIZO criar tag, branches, status e PR draft no repositorio de testes'
+  displayName: 'AUTORIZO criar tag, branches, status e PR draft no repositorio de exemplo'
   type: boolean
   default: false
 
@@ -42,39 +30,50 @@ jobs:
 
   - pwsh: |
       $ErrorActionPreference = 'Stop'
-      if ('${{ parameters.allowTestWrites }}' -ne 'True') {
-        throw 'Execucao bloqueada. Confirme allowTestWrites=true e use um repositorio Azure Repos exclusivo para testes.'
+      if ('${{ parameters.allowTestWrites }}'.ToLowerInvariant() -ne 'true') {
+        throw 'Execucao bloqueada: marque allowTestWrites=true depois de confirmar que este e um repositorio de exemplo.'
       }
-      $repo = '${{ parameters.testRepositoryId }}'
-      $base = '${{ parameters.baseCommitSha }}'
-      $source = '${{ parameters.sourceCommitSha }}'
+      if ($env:BUILD_REPOSITORY_PROVIDER -ne 'TfsGit') {
+        throw 'Execute a pipeline com o proprio repositorio Azure Repos Git (nao GitHub) como fonte.'
+      }
+      if ($env:BUILD_SOURCEBRANCH -ne 'refs/heads/develop') {
+        throw "Branch incorreta: $env:BUILD_SOURCEBRANCH. Execute somente na develop."
+      }
+      $repo = $env:BUILD_REPOSITORY_ID
+      $source = $env:BUILD_SOURCEVERSION
       if ($repo -notmatch '^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$') {
-        throw 'testRepositoryId deve ser um GUID valido no mesmo projeto do pipeline.'
+        throw 'Build.Repository.ID deve ser um GUID de um repositorio Azure Repos.'
       }
-      if ($base -notmatch '^[a-fA-F0-9]{40}$' -or $source -notmatch '^[a-fA-F0-9]{40}$') {
-        throw 'Os dois commits devem possuir 40 caracteres hexadecimais.'
-      }
-      if ($base -eq $source) {
-        throw 'baseCommitSha e sourceCommitSha nao podem ser iguais.'
+      if ($source -notmatch '^[a-fA-F0-9]{40}$') {
+        throw 'Build.SourceVersion deve ser um SHA Git de 40 caracteres.'
       }
       if (-not $env:SYSTEM_ACCESSTOKEN) {
-        throw 'System.AccessToken nao disponivel. Verifique acesso OAuth do agente.'
+        throw 'System.AccessToken nao disponivel. Verifique as permissoes do Build Service.'
       }
-      Write-Host "Repositorio de testes: $repo"
-      Write-Host "Base: $base; Source: $source"
-      Write-Host "Tag: $(testTag)"
-      Write-Host "Source: $(testSourceBranch)"
-      Write-Host "Target: $(testTargetBranch)"
-      Write-Host 'ATENCAO: criara referencias e um PR draft remoto, mas NUNCA fara merge.'
-    displayName: '00 | Validar permissao explicita, parametros e token'
+      $collection = $env:SYSTEM_COLLECTIONURI.TrimEnd('/')
+      $project = [Uri]::EscapeDataString($env:SYSTEM_TEAMPROJECT)
+      $uri = "$collection/$project/_apis/git/repositories/$repo/commits/$($source)?api-version=7.1"
+      $headers = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
+      $commit = Invoke-RestMethod -Uri $uri -Headers $headers -Method Get -TimeoutSec 30
+      $base = @($commit.parents) | Select-Object -First 1
+      if ($base -notmatch '^[a-fA-F0-9]{40}$') {
+        throw 'O commit develop nao tem commit-pai valido. Crie um commit adicional de teste e repita.'
+      }
+      Write-Host "##vso[task.setvariable variable=E2EBaseSha;]$base"
+      Write-Host "Repositorio de exemplo: $env:BUILD_REPOSITORY_NAME"
+      Write-Host "Branch: $env:BUILD_SOURCEBRANCH"
+      Write-Host "Commit atual: $source"
+      Write-Host "Commit anterior: $base"
+      Write-Host "Tag de teste: $(testTag)"
+      Write-Host "Branches de teste: $(testSourceBranch) e $(testTargetBranch)"
+      Write-Host 'ATENCAO: referencias e PR draft serao criados remotamente. Nenhum merge sera realizado.'
+    displayName: '00 | Validar develop e descobrir commit anterior via REST'
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
   - task: GitTag@1
     displayName: '01 | Dry run da tag'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.sourceCommitSha }}'
       tagName: '$(testTag)'
       dryRun: 'true'
     env:
@@ -83,8 +82,6 @@ jobs:
   - task: GitTag@1
     displayName: '02 | Criar tag de teste'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.sourceCommitSha }}'
       tagName: '$(testTag)'
       dryRun: 'false'
     env:
@@ -93,8 +90,6 @@ jobs:
   - task: GitTag@1
     displayName: '03 | Idempotência da tag'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.sourceCommitSha }}'
       tagName: '$(testTag)'
       dryRun: 'false'
     env:
@@ -103,19 +98,15 @@ jobs:
   - task: GitVerify@1
     displayName: '04 | Validar tag e SHA'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.sourceCommitSha }}'
       refName: '$(testTag)'
       refType: 'tag'
-      expectedSha: '${{ parameters.sourceCommitSha }}'
+      expectedSha: '$(Build.SourceVersion)'
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
   - task: GitBranch@1
     displayName: '05 | Criar branch de origem'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.sourceCommitSha }}'
       branchName: '$(testSourceBranch)'
       dryRun: 'false'
     env:
@@ -124,8 +115,8 @@ jobs:
   - task: GitBranch@1
     displayName: '06 | Criar branch de destino'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.baseCommitSha }}'
+      repositoryId: '$(Build.Repository.ID)'
+      commitSha: '$(E2EBaseSha)'
       branchName: '$(testTargetBranch)'
       dryRun: 'false'
     env:
@@ -134,21 +125,17 @@ jobs:
   - task: GitVerify@1
     displayName: '07 | Validar branch de origem'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.sourceCommitSha }}'
       refName: '$(testSourceBranch)'
       refType: 'branch'
-      expectedSha: '${{ parameters.sourceCommitSha }}'
+      expectedSha: '$(Build.SourceVersion)'
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
   - task: GitCompare@1
     displayName: '08 | Comparar versões'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.sourceCommitSha }}'
-      baseVersion: '${{ parameters.baseCommitSha }}'
-      targetVersion: '${{ parameters.sourceCommitSha }}'
+      baseVersion: '$(E2EBaseSha)'
+      targetVersion: '$(Build.SourceVersion)'
       format: 'markdown'
       maxChanges: '200'
       outputFile: '$(Build.ArtifactStagingDirectory)/GitCompare.md'
@@ -158,10 +145,8 @@ jobs:
   - task: GitChangelog@1
     displayName: '09 | Gerar changelog'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.sourceCommitSha }}'
-      baseVersion: '${{ parameters.baseCommitSha }}'
-      targetVersion: '${{ parameters.sourceCommitSha }}'
+      baseVersion: '$(E2EBaseSha)'
+      targetVersion: '$(Build.SourceVersion)'
       maxCommits: '200'
       outputFile: '$(Build.ArtifactStagingDirectory)/CHANGELOG.md'
     env:
@@ -170,8 +155,6 @@ jobs:
   - task: GitCommitStatus@1
     displayName: '10 | Registrar status no commit'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.sourceCommitSha }}'
       statusName: '$(testStatusName)'
       statusGenre: 'validation'
       state: 'succeeded'
@@ -183,8 +166,6 @@ jobs:
   - task: GitPullRequest@1
     displayName: '11 | Criar PR draft de teste'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.sourceCommitSha }}'
       sourceBranch: '$(testSourceBranch)'
       targetBranch: '$(testTargetBranch)'
       title: '[TESTE] Git Tasks E2E $(Build.BuildId)'
@@ -197,8 +178,6 @@ jobs:
   - task: GitMerge@1
     displayName: '12 | Simular merge, sem alterar branch'
     inputs:
-      repositoryId: '${{ parameters.testRepositoryId }}'
-      commitSha: '${{ parameters.sourceCommitSha }}'
       sourceBranch: '$(testSourceBranch)'
       targetBranch: '$(testTargetBranch)'
       mergeStrategy: 'noFastForward'

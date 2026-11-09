@@ -1,48 +1,51 @@
 # Pipeline de integração Azure DevOps — 8 Git Tasks
 
-O arquivo [azure-pipelines-test-all.yml](../azure-pipelines-test-all.yml) invoca **todas as oito tasks** em um agente Azure DevOps real. Não é o mesmo que os testes unitários do GitHub Actions.
+O arquivo [azure-pipelines-test-all.yml](../azure-pipelines-test-all.yml) exercita as oito tasks num agente Azure Pipelines real. **Nao precisa informar repositorio ou SHA**: usa a propria fonte do pipeline, que precisa ser um repositorio **Azure Repos Git na branch develop**.
 
 ## Pré-requisitos
 
-1. Instalar o VSIX **Git Tasks for Azure Pipelines** na organização Azure DevOps.
-2. Ter agente >= 4.265.1 (Node24) no pool `managed-agent-pool-linux` ou ajustar o campo `pool`.
-3. Criar ou escolher um **repositório Azure Repos Git exclusivamente de testes**, no **mesmo projeto Azure DevOps** da pipeline. Não utilize um repositório de produção.
-4. Separar os SHAs completos de 40 caracteres de dois commits nesse repositório. `sourceCommitSha` deve ser descendente de `baseCommitSha`, com pelo menos uma alteração, para permitir a criação de um Pull Request.
-5. Garantir que a identidade Build Service possua permissões para ler os commits, criar tags e branches, publicar status e criar Pull Requests no repositório de testes.
-6. Acesso ao `System.AccessToken`: o arquivo o mapeia explicitamente em `env` para tornar o teste reproduzível. Não exige PAT.
+1. Instalar o VSIX Git Tasks for Azure Pipelines na organizacao Azure DevOps.
+2. Usar agent >= 4.265.1 (Node24). Pool configurado: `managed-agent-pool-linux`.
+3. Usar **um repositorio Azure Repos Git exclusivo para testes**, com branch `develop` e pelo menos dois commits. Nao usar producao.
+4. Copiar o arquivo `azure-pipelines-test-all.yml` deste repositorio GitHub **para a branch `develop` do repositorio Azure Repos de exemplo**, e configurar a pipeline Azure DevOps com esse repositorio como **fonte `self`**. Se a fonte da pipeline continuar sendo GitHub, a validacao inicial bloqueara a execucao.
+5. Conceder a identidade Build Service permissoes de leitura, criacao de tags e branches, status e Pull Requests no repo de exemplo. `System.AccessToken` e mapeado em `env`, sem PAT.
 
-## Como criar e executar
+## Execucao
 
-1. Azure DevOps → **Pipelines → New pipeline → GitHub** e selecione `pitinga/azure-pipelines-tasks-git`.
-2. Escolha **Existing Azure Pipelines YAML file** e indique `/azure-pipelines-test-all.yml` na branch `main`.
-3. Execute manualmente com **Run pipeline**. O pipeline possui `trigger: none` e `pr: none`, portanto não inicia automaticamente.
-4. Informe `testRepositoryId` (GUID do repositório Azure Repos), `baseCommitSha` e `sourceCommitSha`.
-5. Marque `allowTestWrites: true` somente depois de revisar o repositório selecionado. Seu valor padrão é `false` e o pré-teste bloqueará qualquer gravação.
+Azure DevOps → Pipelines → New pipeline → Azure Repos Git → escolha o **repositorio de exemplo** → Existing Azure Pipelines YAML file → branch **develop** → caminho `/azure-pipelines-test-all.yml`.
 
-## Cobertura
+Em **Run pipeline**, selecione `develop` e marque somente **`allowTestWrites: true`**. O valor padrao e `false`; sem confirmar, nenhuma operacao remota de escrita ocorrera. Nao ha parametros de GUID ou SHA.
 
-| Task | Teste | Efeito remoto |
+## Como a origem e obtida
+
+- A pipeline verifica `Build.Repository.Provider = TfsGit` e `Build.SourceBranch = refs/heads/develop`.
+- Usa `Build.Repository.ID` e `Build.SourceVersion` fornecidos pelo Azure Pipelines.
+- A etapa de preparo consulta **GET Git Commits** pela API REST do Azure Repos para buscar `parents[0]`, salvando como `$(E2EBaseSha)` para as comparacoes e para a branch de destino.
+- O pipeline utiliza `checkout: none`; as tasks operam remotamente usando a REST API, sem dependencia do checkout local.
+- A pipeline deve usar um commit recente com mudancas em relacao ao anterior. Um commit inicial sem pai nao serve para o teste.
+
+## Cobertura e efeitos
+
+| Task | Teste | Efeito |
 | --- | --- | --- |
-| `GitTag@1` | Dry-run, criação da tag e repetição idempotente | Cria uma tag temporária |
-| `GitVerify@1` | Verifica a tag e a branch no SHA esperado | Leitura |
-| `GitBranch@1` | Cria duas branches temporárias em commits diferentes | Cria branches |
-| `GitCompare@1` | Compara os dois SHAs e gera relatório Markdown | Leitura; arquivo no agente |
-| `GitChangelog@1` | Consulta commits e gera CHANGELOG.md | Leitura; arquivo no agente |
-| `GitCommitStatus@1` | Publica um contexto de validação exclusivo do run | Cria status de commit |
-| `GitPullRequest@1` | Cria PR draft da branch source para a target | Cria um PR de teste |
-| `GitMerge@1` | Confere o PR e simula a tentativa de merge | **Não faz merge** |
+| GitTag | Simulacao, criacao e idempotencia | Cria tag `git-tasks-e2e/<BuildId>` |
+| GitVerify | Confirma SHA da tag e branch | Somente leitura |
+| GitBranch | Cria branch origem no SHA atual e destino no SHA anterior | Cria duas branches temporarias |
+| GitCompare | Compara SHA anterior e atual | Grava `GitCompare.md` no agente |
+| GitChangelog | Compara commits anterior e atual | Grava `CHANGELOG.md` no agente |
+| GitCommitStatus | Publica status de homologacao | Cria status de commit com contexto especifico |
+| GitPullRequest | Cria um PR draft entre as branches temporarias | Cria PR de teste |
+| GitMerge | Verifica PR e simula merge | **Nao realiza merge** (`dryRun=true`) |
 
-Os relatórios `GitCompare.md` e `CHANGELOG.md` ficam nos artifacts da execução do pipeline.
+Os dois relatorios sao publicados como artifacts do pipeline.
 
-## Segurança e limites do teste
+## Protecoes e limpeza
 
-- **Nenhum merge real é realizado**. `GitMerge@1` é executada com `dryRun: 'true'` e `confirmMerge: 'false'`.
-- Os nomes de tag e branches têm o prefixo `git-tasks-e2e/<Build.BuildId>` para evitar colisões. O contexto de status também identifica o build.
-- O PR é criado como **draft**, sem tentativa de aprovação ou conclusão.
-- **Não há limpeza automática**: após conferir o resultado, abandone o PR e exclua a tag e branches de teste no Azure Repos.
-- O pipeline configura `checkout: none` e fornece `repositoryId` e `commitSha` explicitamente: isso demonstra que o código local do agente não é necessário.
-- A descoberta automática de artefatos de **Classic Releases** não é testada nesse YAML e precisa de um teste adicional em uma Classic Release.
-- A descoberta automática do token sem mapeamento `env` também não é testada aqui, deliberadamente. Nosso teste usa o token explícito para isolar problemas de autenticação.
-- As tasks GitCompare/Changelog podem limitar a contagem de alterações/commits conforme os parâmetros respectivos.
+- `trigger: none` e `pr: none`: somente execucao manual.
+- A preparacao recusa fontes que nao sejam Azure Repos Git, branch diferente de develop e commits sem pai.
+- Cria somente tags/branches com prefixo `git-tasks-e2e/<BuildId>` e PR `draft`.
+- GitMerge usa `confirmMerge: false` e `dryRun: true`; nao faz merge, mesmo quando autorizado a executar os demais testes.
+- **A limpeza e manual**: abandone o PR draft e exclua as branches e a tag de teste quando terminar.
+- Essa pipeline nao prova a descoberta de artefatos Classic Release e nao exercita conclusao real de PR.
 
-Importante: os testes unitários e o build VSIX no GitHub Actions não executam as tasks no Azure DevOps. Este YAML só será de fato executado quando configurado e disparado em Azure Pipelines.
+Os testes estruturais do GitHub Actions validam o YAML, mas nao substituem uma execucao efetiva no Azure DevOps.
