@@ -24,3 +24,21 @@ test('Every task contributes to Marketplace and is Node24 only',()=>{
    assert.equal(task.minimumAgentVersion,'4.265.1');
  }
 });
+
+test('Public 1.0.0 release preserves existing task GUIDs and API majors',()=>{
+ const manifest=require('../vss-extension.json');
+ assert.equal(manifest.public,true);
+ assert.equal(manifest.version,'1.0.0');
+ assert.equal(require('../package.json').version,'1.0.0');
+ assert.equal(manifest.publisher,'pitinga');
+ assert.equal(manifest.id,'azure-pipelines-tasks-git');
+ const ids=['8d52d722-a311-449d-a2b3-7a12dd96a101','8d52d722-a311-449d-a2b3-7a12dd96a102','8d52d722-a311-449d-a2b3-7a12dd96a103','8d52d722-a311-449d-a2b3-7a12dd96a104','8d52d722-a311-449d-a2b3-7a12dd96a105','8d52d722-a311-449d-a2b3-7a12dd96a106','8d52d722-a311-449d-a2b3-7a12dd96a107','8d52d722-a311-449d-a2b3-7a12dd96a108'];
+ assert.deepEqual(manifest.contributions.map(c=>require('../tasks/'+c.properties.name+'/task.json').id),ids);
+ assert.ok(manifest.contributions.every(c=>require('../tasks/'+c.properties.name+'/task.json').version.Major===1));
+ assert.equal(manifest.content.details.path,'overview.md');
+ assert.equal(manifest.content.license.path,'LICENSE');
+ const listing=fs.readFileSync(path.join(root,'overview.md'),'utf8');
+ assert.ok(listing.includes('Classic Release'));
+ assert.ok(listing.includes('GitMerge@1'));
+ assert.ok(listing.includes('Node.js 24'));
+});

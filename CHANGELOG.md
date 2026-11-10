@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 1.0.0 — Preparação para a primeira publicação pública
+
+- Manifesto da extensão marcado como público e versão de lançamento atualizada.
+- Identidade `pitinga.azure-pipelines-tasks-git` e GUIDs das oito tasks preservados.
+- Documentação do Marketplace e exemplos YAML atualizados para a autenticação automática e booleanos corretos.
+- Funcionalidades homologadas em Azure Pipelines e Classic Releases, com agentes Linux / Node24.
+
 ## 0.1.3 — URLs de Classic Release / Azure DevOps
 
 - Normaliza URLs oficiais de coleções Azure DevOps (`dev.azure.com`, `*.visualstudio.com`) e URLs do serviço de Releases (`vsrm.dev.azure.com`, `*.vsrm.visualstudio.com`) para seus respectivos endpoints Git/Build e Release.
@@ -8,8 +15,6 @@
 - Corrige informação sobre OAuth nos metadados das oito tasks.
 - Atualiza versões patch das oito tasks para garantir a substituição dos arquivos armazenados em cache nos agentes.
 - Acrescenta testes para formatos de endereço moderno/legado, fallback e rejeição de URLs inválidas.
-
-# Histórico de versões
 
 ## 0.1.2 — GitChangelog: consulta independente do histórico
 

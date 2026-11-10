@@ -1,6 +1,8 @@
 # Git Tasks for Azure Pipelines
 
-Extensão Azure DevOps com 8 tasks Azure Repos Git, **Node.js 24 exclusivamente**. Não é um fork da extensão `jabbera`; é uma implementação nova com IDs próprios.
+Extensão pública Azure DevOps com 8 tasks Azure Repos Git, **Node.js 24 exclusivamente**. Implementação independente, com IDs próprios e licença MIT.
+
+**Versão pública 1.0.0** — os nomes, GUIDs e versões major das oito tasks continuam compatíveis com os pipelines já homologados.
 
 | Task | Propósito | Inputs principais |
 | --- | --- | --- |
@@ -39,20 +41,16 @@ steps:
   displayName: 'Git | Create release tag'
   inputs:
     tagName: 'v1.2.3'
-    dryRun: 'true'
-  env:
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    dryRun: false
 
 - task: GitVerify@1
   displayName: 'Git | Verify approved commit'
   inputs:
     refName: 'v1.2.3'
     expectedSha: '$(Build.SourceVersion)'
-  env:
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 ```
 
-A primeira execução deve usar `dryRun=true`. Desative a simulação antes de usar `GitVerify`, que verifica uma tag já criada.
+Para simular antes da execução real, altere temporariamente `dryRun: true`. `GitVerify` exige uma tag já existente.
 
 ## Exemplo 3 — GitCompare e GitChangelog
 
@@ -63,21 +61,19 @@ A primeira execução deve usar `dryRun=true`. Desative a simulação antes de u
     targetVersion: 'tag:v1.2.3'
     format: 'markdown'
     outputFile: '$(Build.ArtifactStagingDirectory)/compare.md'
-  env:
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 - task: GitChangelog@1
   inputs:
     baseVersion: 'tag:v1.2.2'
     targetVersion: 'tag:v1.2.3'
     outputFile: '$(Build.ArtifactStagingDirectory)/CHANGELOG.md'
-  env:
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 - task: PublishPipelineArtifact@1
   condition: always()
   inputs:
     targetPath: '$(Build.ArtifactStagingDirectory)'
     artifact: 'git-reports'
 ```
+
+O token interno costuma dispensar `env: SYSTEM_ACCESSTOKEN` nas Git Tasks; quando indisponível, mapeie essa variável explicitamente como descrito nos requisitos.
 
 Versões precisam de sintaxe explícita: `tag:NOME`, `branch:NOME`, `refs/tags/NOME`, `refs/heads/NOME` ou SHA completo.
 
@@ -89,10 +85,8 @@ Versões precisam de sintaxe explícita: `tag:NOME`, `branch:NOME`, `refs/tags/N
     sourceBranch: 'release/1.2.3'
     targetBranch: 'main'
     title: 'Release 1.2.3'
-    draft: 'true'
-    dryRun: 'true'
-  env:
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    draft: true
+    dryRun: true
 
 # Em um job de aprovação separado, depois de aprovar o PR:
 - task: GitMerge@1
@@ -100,13 +94,11 @@ Versões precisam de sintaxe explícita: `tag:NOME`, `branch:NOME`, `refs/tags/N
     sourceBranch: 'release/1.2.3'
     targetBranch: 'main'
     mergeStrategy: 'noFastForward'
-    confirmMerge: 'true'
-    dryRun: 'true'
-  env:
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    confirmMerge: true
+    dryRun: true  # Altere para false apenas após aprovar o PR
 ```
 
-**GitMerge requer exatamente um PR ativo** para origem e destino. Não realiza merge Git local, não ignora políticas e não exclui a branch de origem. Uma requisição de conclusão pode ser processada de forma assíncrona; verifique o status final do PR no Azure DevOps.
+**GitMerge requer exatamente um PR ativo** para origem e destino. No exemplo acima, `dryRun: true` simula o merge. Para concluir um PR autorizado, defina `confirmMerge: true` e `dryRun: false`. Não realiza merge Git local, não ignora políticas e não exclui a branch de origem. Uma requisição de conclusão pode ser processada de forma assíncrona; verifique o status final do PR no Azure DevOps.
 
 ## Autenticação, segurança e limitações
 
@@ -118,8 +110,10 @@ Versões precisam de sintaxe explícita: `tag:NOME`, `branch:NOME`, `refs/tags/N
 - GitTag cria **lightweight tags**, não annotated/signed tags.
 - O changelog usa o indicador `aheadCount` de `diffs/commits` e consulta o histórico do destino separadamente por `GET /commits`, evitando a comparação com filtro que retornava lista vazia no Azure Repos. Limita a `maxCommits`; agrupa `feat:` e `fix:` e coloca os demais em Other. Uma lista incompleta gera erro; a paginação completa ainda não é suportada.
 - O compare limita resultados a `maxChanges` e inclui indicadores de truncamento.
-- O projeto não executa checkout, merge local nem force-push; GitMerge usa a API de Pull Requests para respeitar branch policies.
-- A versão de extensão é **0.1.3**; as tasks usam **@1** (Major=1). `GitChangelog` está em **1.0.3**; as outras sete tasks estão em **1.0.1**. Não publique no Marketplace antes de homologar em DEV/QAS.
+- As tasks não executam checkout, merge local nem force-push; GitMerge usa a API de Pull Requests para respeitar branch policies. Um pipeline pode fazer checkout normalmente em etapas separadas.
+- A versão pública da extensão é **1.0.0**. As tasks usam **@1** (Major 1); `GitChangelog` está em **1.0.3** e as demais em **1.0.1**. Mantidos os IDs e contratos existentes.
+- A homologação abrangeu tag/branch, verificação de SHA, GitCompare, GitChangelog com múltiplos commits, commit status, PR idempotente, merge real entre branches de teste e identificação automática de Build em Classic Release.
+- Para cada atualização do Marketplace, incremente a versão da extensão; para qualquer alteração de código da task, incremente também sua versão no `task.json`.
 
 ## Desenvolvimento e testes
 
@@ -130,6 +124,10 @@ npx --yes tfx-cli@0.24.2 extension create --manifest-globs vss-extension.json --
 ```
 
 `npm test` usa Node Test Runner, sem dependências runtime. Build copia o código para 8 packages isolados e gera ícones PNG de 128px. O GitHub Actions verifica as oito tasks, os recursos do Marketplace e produz o VSIX como artifact.
+
+### Publicação no Marketplace
+
+O manifesto está preparado com `public: true`, mas essa alteração não torna a extensão automaticamente pública: é necessário fazer o upload autenticado do VSIX no Marketplace. Consulte [o guia de publicação](docs/PUBLICACAO.md).
 
 ### Links
 

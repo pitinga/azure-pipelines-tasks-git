@@ -1,76 +1,84 @@
 # Git Tasks for Azure Pipelines
 
-Extensão para **Azure Repos Git** com **8 tasks independentes**, todas usando exclusivamente **Node.js 24** (agente Azure Pipelines >= 4.265.1).
+**Eight Node.js 24 tasks for Azure Repos Git**, available for Azure Pipelines YAML builds and Classic Releases.
+Create and verify remote Git references, compare versions, generate release notes and manage pull requests. The tasks use Azure DevOps REST APIs; a local Git checkout is not required.
 
-| Task | Operação |
+## Included tasks
+
+| Task | Operation |
 | --- | --- |
-| `GitTag@1` | Cria tags Git leves nos commits dos artefatos de builds ou Classic Releases |
-| `GitBranch@1` | Cria branches de release/hotfix a partir dos commits publicados |
-| `GitCompare@1` | Compara duas referências e gera JSON ou Markdown |
-| `GitChangelog@1` | Cria changelog Markdown baseado nos commits de duas versões |
-| `GitVerify@1` | Valida que uma tag/branch aponta para o SHA esperado |
-| `GitCommitStatus@1` | Publica status de commit para rastreabilidade de deploy |
-| `GitPullRequest@1` | Cria PR idempotente, opcionalmente como rascunho |
-| `GitMerge@1` | Solicita conclusão de PR existente sem ignorar políticas |
+| **GitTag@1** | Creates lightweight tags on the source commits of builds or Classic Release artifacts |
+| **GitBranch@1** | Creates remote Git branches |
+| **GitCompare@1** | Compares two Git versions and writes Markdown or JSON |
+| **GitChangelog@1** | Generates Markdown release notes, grouping Features, Fixes and Other commits |
+| **GitVerify@1** | Confirms that a tag or branch points to the expected SHA |
+| **GitCommitStatus@1** | Publishes validation or deployment status on a commit |
+| **GitPullRequest@1** | Creates a pull request without duplicating an existing active one |
+| **GitMerge@1** | Requests a merge of an existing PR with explicit confirmation; branch policies are not bypassed |
 
-## Exemplo — criar tag no Classic Release
+## YAML build: create and verify a tag
 
-Adicione **GitTag** ao job de implantação. Com parâmetros padrão, a task descobre os artefatos `Build` de origem **Azure Repos Git** na release e cria tags nos commits correspondentes. É possível limitar a operação usando `artifactAliases`.
-
-Para um build YAML, exemplo:
-
-```yaml
+~~~yaml
 steps:
 - task: GitTag@1
-  displayName: 'Git | Tag da versão'
   inputs:
-    tagName: 'v1.2.3'
-    dryRun: 'true'   # Primeiro teste
-  env:
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-```
+    tagName: 'release/v1.2.3'
+    dryRun: false
 
-**Autenticação:** conceda `Contribute`/permissão de criar tags ao Build Service, conforme a operação. Em Classic Releases, habilite **Allow scripts to access the OAuth token** no agent job. Para YAML, mapeie `SYSTEM_ACCESSTOKEN` via `env`.
-
-## GitVerify — conferir commit aprovado
-
-```yaml
 - task: GitVerify@1
   inputs:
-    refName: 'v1.2.3'
+    refName: 'release/v1.2.3'
     refType: 'tag'
-    # expectedSha vazio = Build.SourceVersion
-  env:
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-```
+    expectedSha: '$(Build.SourceVersion)'
+~~~
 
-## GitCompare e GitChangelog
+Use `dryRun: true` to simulate an operation before committing changes. `false` is the default.
 
-```yaml
+## Classic Release: discover the artifact automatically
+
+1. Attach an **Azure Repos Git Build artifact** to your Classic Release.
+2. Add **GitTag@1** to the stage's Agent Job and enable **Allow scripts to access the OAuth token**.
+3. Set `tagName` (for example, `release/$(Release.ReleaseId)`). Leave `repositoryId` and `commitSha` empty.
+4. Use `dryRun: true` for validation, then `dryRun: false` to create the tag.
+5. Add **GitVerify@1** with the same tag and leave `expectedSha` empty to confirm the artifact commit.
+
+The source repository and commit are discovered from the build metadata, not from files downloaded on the agent. Use `artifactAliases` when a release contains multiple Build artifacts.
+
+## Compare and document versions
+
+~~~yaml
 - task: GitCompare@1
   inputs:
     baseVersion: 'tag:v1.2.2'
     targetVersion: 'tag:v1.2.3'
-    format: 'markdown'
-    outputFile: '$(Build.ArtifactStagingDirectory)/compare.md'
-  env:
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    format: markdown
+    outputFile: '$(Build.ArtifactStagingDirectory)/GitCompare.md'
+
 - task: GitChangelog@1
   inputs:
     baseVersion: 'tag:v1.2.2'
     targetVersion: 'tag:v1.2.3'
     outputFile: '$(Build.ArtifactStagingDirectory)/CHANGELOG.md'
-  env:
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-```
+~~~
 
-## Proteções
+References accept full SHA hashes, `tag:NAME`, `branch:NAME`, `refs/tags/NAME`, or `refs/heads/NAME`. Messages starting with `feat:` and `fix:` are grouped separately; other commit messages appear under **Other**.
 
-- Apenas Azure Repos Git; requisições HTTPS para a organização Azure DevOps do job.
-- Nenhuma tag/branch existente é movida automaticamente: se aponta para outro SHA, a task falha.
-- `GitMerge` exige PR existente e `confirmMerge=true`; nunca solicita bypass de política ou exclusão automática da branch.
-- `dryRun=true` simula operações de escrita.
-- Artefatos de uma mesma release que apontem para commits conflitantes do mesmo repositório são recusados.
-- Tasks novas possuem identificadores próprios e podem coexistir com a extensão legada de Michael Barry.
+## Security and requirements
 
-**[Documentação detalhada, segurança e exemplos](https://github.com/pitinga/azure-pipelines-tasks-git)**.
+- **Azure DevOps Services / Azure Repos Git** only; not GitHub repositories or Azure DevOps Server.
+- **Node.js 24** task handler; **Azure Pipelines agent 4.265.1+**.
+- Uses the job OAuth identity. The tasks try the internal job token automatically. Where unavailable, map `SYSTEM_ACCESSTOKEN` from `$(System.AccessToken)` to the task. No embedded PAT.
+- Grant the appropriate Azure Repos permissions to the Build Service identity (such as Create tag, Create branch and Contribute to pull requests).
+- Existing tags/branches pointing to another SHA are never force-updated.
+- GitMerge requires an existing active pull request, `confirmMerge: true`, and does not request bypass of branch policies or deletion of the source branch.
+- GitMerge may report `requested` while completion runs asynchronously. Confirm PR status `completed` before declaring a deployment successful.
+- GitChangelog is bounded by `maxCommits` and does not implement complete pagination; verify complex histories with merges or divergent branches.
+- Classic Release discovery is limited to Azure Repos Git Build artifacts in the release project. Lightweight tags only.
+
+## Documentation and support
+
+- [Documentation, examples and limitations](https://github.com/pitinga/azure-pipelines-tasks-git)
+- [Release history](https://github.com/pitinga/azure-pipelines-tasks-git/blob/main/CHANGELOG.md)
+- [Report an issue](https://github.com/pitinga/azure-pipelines-tasks-git/issues)
+
+**MIT License.** Independently developed; distinct IDs from historical Tag Artifacts extensions.
