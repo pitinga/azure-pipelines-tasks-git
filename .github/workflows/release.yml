@@ -1,0 +1,173 @@
+name: Version tag and GitHub Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'draft = tag + rascunho; publish = tornar publico apos Marketplace'
+        required: true
+        type: choice
+        options:
+          - draft
+          - publish
+        default: draft
+      version:
+        description: 'Versao sem v, ex. 1.0.0'
+        required: true
+        type: string
+      commit_sha:
+        description: 'SHA aprovado com o codigo e manifesto dessa versao (apenas draft)'
+        required: false
+        type: string
+      build_run_id:
+        description: 'ID do GitHub Actions que validou o VSIX (apenas draft)'
+        required: false
+        type: string
+      marketplace_confirmation:
+        description: 'Para publish: digite PUBLICADO apos confirmar Marketplace'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: github-release-${{ github.repository }}-${{ inputs.version || 'bootstrap' }}
+  cancel-in-progress: false
+
+jobs:
+  register-release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code and manifests
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Resolve version and approved source
+        id: meta
+        shell: bash
+        env:
+          RELEASE_OPERATION: ${{ inputs.operation }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ inputs.commit_sha }}
+          RELEASE_RUN_ID: ${{ inputs.build_run_id }}
+          MARKETPLACE_CONFIRMATION: ${{ inputs.marketplace_confirmation }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            operation="draft"
+            version="1.0.0"
+            source_sha="166c0bf7ed69e3143b5ef82021ad81da19bb33c4"
+            run_id="42885420312"
+          else
+            operation="$RELEASE_OPERATION"
+            version="$RELEASE_VERSION"
+            source_sha="$RELEASE_SHA"
+            run_id="$RELEASE_RUN_ID"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Versao invalida: informe major.minor.patch."
+            exit 1
+          fi
+          tag="v$version"
+          if [[ "$operation" == "draft" ]]; then
+            if [[ ! "$source_sha" =~ ^[0-9a-fA-F]{40}$ || ! "$run_id" =~ ^[0-9]+$ ]]; then
+              echo "::error::draft exige commit_sha e build_run_id validos."
+              exit 1
+            fi
+            git cat-file -e "$source_sha^{commit}"
+            manifest_version=$(git show "$source_sha:vss-extension.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')
+            if [[ "$manifest_version" != "$version" ]]; then
+              echo "::error::Manifesto do commit $source_sha usa $manifest_version, esperado $version."
+              exit 1
+            fi
+          elif [[ "$operation" == "publish" ]]; then
+            if [[ "$MARKETPLACE_CONFIRMATION" != "PUBLICADO" ]]; then
+              echo "::error::Confirme PUBLICADO somente apos verificar Marketplace."
+              exit 1
+            fi
+          else
+            echo "::error::Operacao invalida: $operation"
+            exit 1
+          fi
+          echo "operation=$operation" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+      - name: Check approved CI and download immutable VSIX
+        if: steps.meta.outputs.operation == 'draft'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.meta.outputs.source_sha }}
+          RUN_ID: ${{ steps.meta.outputs.run_id }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          conclusion=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')
+          run_sha=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')
+          if [[ "$conclusion" != "success" || "$run_sha" != "$SOURCE_SHA" ]]; then
+            echo "::error::CI nao corresponde ao commit aprovado ou nao terminou com sucesso."
+            exit 1
+          fi
+          mkdir -p release-assets
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name "git-tasks-vsix" --dir release-assets
+          count=$(find release-assets -type f -name '*.vsix' | wc -l)
+          package=$(find release-assets -type f -name '*.vsix' -print -quit)
+          if [[ "$count" -ne 1 || "$(basename "$package")" != *"-$VERSION.vsix" ]]; then
+            echo "::error::Esperado exatamente um VSIX da versao $VERSION."
+            exit 1
+          fi
+          sha256sum "$package"
+      - name: Create immutable tag and draft GitHub Release
+        if: steps.meta.outputs.operation == 'draft'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          SOURCE_SHA: ${{ steps.meta.outputs.source_sha }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          if existing=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha' 2>/dev/null); then
+            if [[ "$existing" != "$SOURCE_SHA" ]]; then
+              echo "::error::Tag $TAG ja aponta para outro commit: $existing. Nao sera movida."
+              exit 1
+            fi
+            echo "Tag existente, SHA correto: $TAG"
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$TAG" -f "sha=$SOURCE_SHA" >/dev/null
+            echo "Tag criada: $TAG -> $SOURCE_SHA"
+          fi
+          package=$(find release-assets -type f -name '*.vsix' -print -quit)
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            is_draft=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')
+            if [[ "$is_draft" != "true" ]]; then
+              echo "::error::Release $TAG ja esta publicada: arquivo imutavel."
+              exit 1
+            fi
+            gh release upload "$TAG" "$package" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" "$package" --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --draft --title "Git Tasks $VERSION" --generate-notes
+          fi
+          echo "Release draft disponivel em https://github.com/$GITHUB_REPOSITORY/releases"
+      - name: Publish confirmed GitHub Release
+        if: steps.meta.outputs.operation == 'publish'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          echo "GitHub Release $TAG publicada depois da confirmacao do Marketplace."
