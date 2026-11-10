@@ -42,3 +42,26 @@ test('Public 1.0.0 release preserves existing task GUIDs and API majors',()=>{
  assert.ok(listing.includes('GitMerge@1'));
  assert.ok(listing.includes('Node.js 24'));
 });
+
+test('Git Tasks Marketplace publication finalizes release only after successful upload',()=>{
+ const wf=fs.readFileSync(path.join(root,'.github/workflows/publish-marketplace.yml'),'utf8');
+ assert.match(wf,/permissions:\n  contents: write/);
+ assert.match(wf,/uses: actions\/checkout@v7/);
+ assert.match(wf,/uses: actions\/setup-node@v7/);
+ assert.match(wf,/node-version: '24'/);
+ assert.match(wf,/fetch-depth: 0/);
+ const upload=wf.indexOf('      - name: Publish to Marketplace');
+ const release=wf.indexOf('      - name: Register tag and final GitHub Release');
+ assert.ok(upload>0 && release>upload);
+ assert.match(wf.slice(release),/gh release edit .*--draft=false/);
+ assert.match(wf,/VS_MARKETPLACE_TOKEN/);
+});
+
+test('Tag and draft release are created only from verified CI artifacts',()=>{
+ const wf=fs.readFileSync(path.join(root,'.github/workflows/release.yml'),'utf8');
+ assert.match(wf,/gh run view .*--json conclusion/);
+ assert.match(wf,/gh run download/);
+ assert.match(wf,/gh release create .*--draft/);
+ assert.match(wf,/MARKETPLACE_CONFIRMATION/);
+ assert.match(wf,/contents: write/);
+});

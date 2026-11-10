@@ -137,3 +137,7 @@ O manifesto está preparado com `public: true`, mas essa alteração não torna 
 - [Reportar problemas](https://github.com/pitinga/azure-pipelines-tasks-git/issues)
 
 MIT License; copyright do autor do repositório. Projeto independente da extensão histórica.
+
+## GitHub Tags e Releases
+
+A criação de versões é rastreável: [release.yml](.github/workflows/release.yml) obtém o VSIX de um **GitHub Actions aprovado**, valida o commit e cria a tag `vX.Y.Z` e uma **GitHub Release draft** sem declarar publicação antecipada. A [publicação no Marketplace](.github/workflows/publish-marketplace.yml) exige confirmação `PUBLICAR` e um secret `VS_MARKETPLACE_TOKEN` no environment `marketplace-production`. **Somente se o Marketplace aceitar o VSIX**, a release é publicada no GitHub, anexando o mesmo pacote. Se a publicação for manual pelo portal, o workflow `release.yml` permite finalizar a draft com a opção `publish` após informar `PUBLICADO`.
