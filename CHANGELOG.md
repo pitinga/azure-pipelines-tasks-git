@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 0.1.3 — URLs de Classic Release / Azure DevOps
+
+- Normaliza URLs oficiais de coleções Azure DevOps (`dev.azure.com`, `*.visualstudio.com`) e URLs do serviço de Releases (`vsrm.dev.azure.com`, `*.vsrm.visualstudio.com`) para seus respectivos endpoints Git/Build e Release.
+- Prioriza `SYSTEM_TEAMFOUNDATIONCOLLECTIONURI` nas Classic Releases, com compatibilidade para os nomes alternativos de variável de sistema.
+- Mantém validação estrita HTTPS de host oficial, sem aceitar domínios arbitrários.
+- Corrige informação sobre OAuth nos metadados das oito tasks.
+- Atualiza versões patch das oito tasks para garantir a substituição dos arquivos armazenados em cache nos agentes.
+- Acrescenta testes para formatos de endereço moderno/legado, fallback e rejeição de URLs inválidas.
+
+# Histórico de versões
+
 ## 0.1.2 — GitChangelog: consulta independente do histórico
 
 - Calcula quantidade de commits novos pelo endpoint `diffs/commits`, já homologado pela task GitCompare.

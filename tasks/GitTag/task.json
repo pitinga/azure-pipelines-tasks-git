@@ -3,7 +3,7 @@
   "name": "GitTag",
   "friendlyName": "Criar Tag Git",
   "description": "Cria tags imutáveis nos commits de artefatos de Classic Release ou de um build.",
-  "helpMarkDown": "Azure Repos Git; suporta CI e Classic Release. Requer SYSTEM_ACCESSTOKEN e agente >= 4.265.1.",
+  "helpMarkDown": "Azure Repos Git; CI e Classic Release. Usa token OAuth do job, com descoberta automática quando disponível. Requer agente >= 4.265.1 (Node24).",
   "category": "Utility",
   "visibility": [
     "Build",
@@ -13,7 +13,7 @@
   "version": {
     "Major": 1,
     "Minor": 0,
-    "Patch": 0
+    "Patch": 1
   },
   "minimumAgentVersion": "4.265.1",
   "instanceNameFormat": "Criar Tag Git",

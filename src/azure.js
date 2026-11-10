@@ -1,28 +1,47 @@
 'use strict';
 const {sha,refName} = require('./runtime');
 const ZERO='0'.repeat(40);
-function collectionDetails(env=process.env) {
-  const address=env.SYSTEM_COLLECTIONURI || env.SYSTEM_TEAMFOUNDATIONCOLLECTIONURI;
-  const project=env.SYSTEM_TEAMPROJECTID || env.SYSTEM_TEAMPROJECT;
-  const token=env.SYSTEM_ACCESSTOKEN || env.ENDPOINT_AUTH_PARAMETER_SYSTEMVSSCONNECTION_ACCESSTOKEN;
-  if (!address || !project) throw new Error('SYSTEM_COLLECTIONURI e SYSTEM_TEAMPROJECT não disponíveis.');
-  const parsed=new URL(address);
-  if (parsed.protocol!=='https:' ||
-     !(parsed.hostname==='dev.azure.com' || /^[a-z0-9-]+\.visualstudio\.com$/.test(parsed.hostname))) {
-     throw new Error('Somente organizações hospedadas em Azure DevOps Services (HTTPS) são suportadas.');
+function normalizeAzureAddress(address) {
+  let parsed;
+  try { parsed=new URL(String(address||'').trim()); }
+  catch { throw new Error('URL da coleção Azure DevOps ausente ou inválida.'); }
+  const hostname=parsed.hostname.toLowerCase();
+  if(parsed.protocol!=='https:' || parsed.username || parsed.password || parsed.port) {
+    throw new Error('Somente URLs HTTPS oficiais do Azure DevOps Services são suportadas.');
   }
-  let organization, base, releaseBase;
-  if (parsed.hostname==='dev.azure.com') {
+  let organization,base,releaseBase;
+  // Classic Releases can expose vsrm.dev.azure.com (or *.vsrm.visualstudio.com)
+  // as their service URI. The normal Git/Build API must still use the
+  // organization collection endpoint, never the Release Management host.
+  if(hostname==='dev.azure.com' || hostname==='vsrm.dev.azure.com') {
     organization=parsed.pathname.split('/').filter(Boolean)[0];
-    if (!organization) throw new Error('Organização não encontrada na Collection URI.');
-    base='https://dev.azure.com/' + encodeURIComponent(organization);
-    releaseBase='https://vsrm.dev.azure.com/' + encodeURIComponent(organization);
+    if(!organization || !/^[a-z0-9-]+$/i.test(organization)) {
+      throw new Error('Organização não encontrada na URI Azure DevOps.');
+    }
+    base='https://dev.azure.com/' + organization;
+    releaseBase='https://vsrm.dev.azure.com/' + organization;
   } else {
-    organization=parsed.hostname.split('.')[0];
-    base='https://' + parsed.hostname;
+    const legacy=hostname.match(/^([a-z0-9-]+)(?:\.vsrm)?\.visualstudio\.com$/);
+    if(!legacy)throw new Error('Host Azure DevOps não suportado: '+hostname+'. Use a URL da coleção oficial.');
+    organization=legacy[1];
+    base='https://' + organization + '.visualstudio.com';
     releaseBase='https://' + organization + '.vsrm.visualstudio.com';
   }
-  if (!token) throw new Error('SYSTEM_ACCESSTOKEN não disponível. Habilite acesso OAuth ao job/release e mapeie env: SYSTEM_ACCESSTOKEN: $(System.AccessToken).');
+  return {organization,base,releaseBase};
+}
+function collectionDetails(env=process.env) {
+  // Microsoft documents TeamFoundationCollectionUri as the canonical URL for
+  // Git/Build APIs in Classic Releases. Prefer it over the release-service
+  // URL exposed in some job contexts.
+  const address=env.SYSTEM_TEAMFOUNDATIONCOLLECTIONURI ||
+    env.SYSTEM_COLLECTIONURI || env.SYSTEM_TEAMFOUNDATIONSERVERURI;
+  const project=env.SYSTEM_TEAMPROJECTID || env.SYSTEM_TEAMPROJECT;
+  const token=env.SYSTEM_ACCESSTOKEN || env.ENDPOINT_AUTH_PARAMETER_SYSTEMVSSCONNECTION_ACCESSTOKEN;
+  if(!address || !project) {
+    throw new Error('URI da coleção e/ou SYSTEM_TEAMPROJECT não disponíveis na task.');
+  }
+  const {base,releaseBase,organization}=normalizeAzureAddress(address);
+  if(!token)throw new Error('Token OAuth não disponível. Verifique o acesso ao token OAuth no Agent Job da Classic Release.');
   return {base,releaseBase,project,organization,token};
 }
 class AzureClient {
@@ -119,4 +138,4 @@ class AzureClient {
     return this.request('POST',this.git(repo)+'/pullrequests',{body:data});
   }
 }
-module.exports={AzureClient,collectionDetails,ZERO};
+module.exports={AzureClient,collectionDetails,normalizeAzureAddress,ZERO};

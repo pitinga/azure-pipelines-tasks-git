@@ -18,7 +18,7 @@ Extensão Azure DevOps com 8 tasks Azure Repos Git, **Node.js 24 exclusivamente*
 - Azure DevOps Services e repositórios **Azure Repos Git** (não GitHub/TFVC).
 - Agent **>= 4.265.1** com executor **Node24**. Build local Node.js **>= 24**.
 - `System.AccessToken` com permissões Git do Build Service para cada operação.
-- Em Classic Release, habilitar **Allow scripts to access the OAuth token** no agent job.
+- Em Classic Release, habilitar **Allow scripts to access the OAuth token** no Agent Job. A task usa o endereço de coleção oficial para Git/Build e o endpoint de Releases para identificar os artefatos; nenhuma URL precisa ser informada manualmente.
 - Em YAML, as tasks tentam obter o token OAuth do job automaticamente. Se o agente não expuser a credencial interna, mapeie `env: SYSTEM_ACCESSTOKEN: $(System.AccessToken)`. Nunca coloque PAT no YAML.
 
 ## Exemplo 1 — Classic Release: substituir Tag Artifacts
@@ -119,7 +119,7 @@ Versões precisam de sintaxe explícita: `tag:NOME`, `branch:NOME`, `refs/tags/N
 - O changelog usa o indicador `aheadCount` de `diffs/commits` e consulta o histórico do destino separadamente por `GET /commits`, evitando a comparação com filtro que retornava lista vazia no Azure Repos. Limita a `maxCommits`; agrupa `feat:` e `fix:` e coloca os demais em Other. Uma lista incompleta gera erro; a paginação completa ainda não é suportada.
 - O compare limita resultados a `maxChanges` e inclui indicadores de truncamento.
 - O projeto não executa checkout, merge local nem force-push; GitMerge usa a API de Pull Requests para respeitar branch policies.
-- A versão de extensão é **0.1.2**; as tasks usam **@1** (Major=1). `GitChangelog` foi atualizado para **1.0.2**. Não publique no Marketplace antes de homologar em DEV/QAS.
+- A versão de extensão é **0.1.3**; as tasks usam **@1** (Major=1). `GitChangelog` está em **1.0.3**; as outras sete tasks estão em **1.0.1**. Não publique no Marketplace antes de homologar em DEV/QAS.
 
 ## Desenvolvimento e testes
 

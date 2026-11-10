@@ -269,3 +269,48 @@ test('GitChangelog refuses missing aheadCount',async()=>{
  const restore=inputs({repositoryId:'repo',commitSha:SHA2,baseVersion:SHA1,targetVersion:SHA2,outputFile:''});
  try{await assert.rejects(()=>actions.changelog(api),/aheadCount válido/);}finally{restore()}
 });
+
+test('Classic Release accepts both modern Azure DevOps collection and VSRM URLs',()=>{
+ const {normalizeAzureAddress}=require('../src/azure');
+ for(const url of ['https://dev.azure.com/GrupoZaffari/','https://vsrm.dev.azure.com/GrupoZaffari/']) {
+  const d=normalizeAzureAddress(url);
+  assert.equal(d.organization,'GrupoZaffari');
+  assert.equal(d.base,'https://dev.azure.com/GrupoZaffari');
+  assert.equal(d.releaseBase,'https://vsrm.dev.azure.com/GrupoZaffari');
+ }
+});
+test('Classic Release accepts legacy organization and VSRM domains',()=>{
+ const {normalizeAzureAddress}=require('../src/azure');
+ for(const url of ['https://GrupoZaffari.visualstudio.com/','https://GrupoZaffari.vsrm.visualstudio.com/']) {
+  const d=normalizeAzureAddress(url);
+  assert.equal(d.organization.toLowerCase(),'grupozaffari');
+  assert.equal(d.base,'https://grupozaffari.visualstudio.com');
+  assert.equal(d.releaseBase,'https://grupozaffari.vsrm.visualstudio.com');
+ }
+});
+test('Classic Release prefers System.TeamFoundationCollectionUri and resolves both API origins',()=>{
+ const d=collectionDetails({
+  SYSTEM_COLLECTIONURI:'https://vsrm.dev.azure.com/AnotherOrg/',
+  SYSTEM_TEAMFOUNDATIONCOLLECTIONURI:'https://dev.azure.com/GrupoZaffari/',
+  SYSTEM_TEAMPROJECTID:'24a7ea9f-71ca-412e-8918-24fafc173967',
+  ENDPOINT_AUTH_PARAMETER_SYSTEMVSSCONNECTION_ACCESSTOKEN:'OAUTH_TOKEN'
+ });
+ assert.equal(d.organization,'GrupoZaffari');
+ assert.equal(d.base,'https://dev.azure.com/GrupoZaffari');
+ assert.equal(d.releaseBase,'https://vsrm.dev.azure.com/GrupoZaffari');
+ assert.equal(d.token,'OAUTH_TOKEN');
+ const client=new AzureClient({...d,fetch:async()=>({ok:true,status:200,text:async()=>JSON.stringify({artifacts:[]})})});
+ assert.equal(client.base,'https://dev.azure.com/GrupoZaffari/24a7ea9f-71ca-412e-8918-24fafc173967');
+ assert.equal(client.releaseBase,'https://vsrm.dev.azure.com/GrupoZaffari/24a7ea9f-71ca-412e-8918-24fafc173967');
+});
+test('Classic Release falls back to release service URI if collection URI is unavailable',()=>{
+ const d=collectionDetails({SYSTEM_TEAMFOUNDATIONSERVERURI:'https://vsrm.dev.azure.com/GrupoZaffari/',SYSTEM_TEAMPROJECT:'Applications',SYSTEM_ACCESSTOKEN:'TEST'});
+ assert.equal(d.base,'https://dev.azure.com/GrupoZaffari');
+ assert.equal(d.releaseBase,'https://vsrm.dev.azure.com/GrupoZaffari');
+});
+test('Azure DevOps URL validation refuses untrusted or non-HTTPS endpoints',()=>{
+ const {normalizeAzureAddress}=require('../src/azure');
+ for(const url of ['http://dev.azure.com/GrupoZaffari/','https://dev.azure.com.evil.test/GrupoZaffari','https://attacker.vsrm.visualstudio.com.evil.test/','https://vsrm.dev.azure.com/','https://dev.azure.com:8443/GrupoZaffari','https://user:pass@dev.azure.com/GrupoZaffari']) {
+  assert.throws(()=>normalizeAzureAddress(url));
+ }
+});
