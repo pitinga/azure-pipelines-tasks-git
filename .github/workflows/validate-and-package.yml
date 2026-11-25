@@ -37,6 +37,8 @@ jobs:
               names=set(z.namelist())
               assert 'extension.vsixmanifest' in names
               assert 'extension.vsomanifest' in names
+              assert 'LICENSE' in names, 'MIT LICENSE ausente do VSIX'
+              assert z.read('LICENSE') == open('LICENSE','rb').read(), 'Licença divergente no pacote'
               for task in ('GitTag','GitBranch','GitCompare','GitChangelog','GitVerify','GitCommitStatus','GitPullRequest','GitMerge'):
                   assert task+'/task.json' in names,task
                   assert task+'/index.js' in names,task

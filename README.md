@@ -2,7 +2,7 @@
 
 Extensão pública Azure DevOps com 8 tasks Azure Repos Git, **Node.js 24 exclusivamente**. Implementação independente, com IDs próprios e licença MIT.
 
-**Versão pública 1.0.0** — os nomes, GUIDs e versões major das oito tasks continuam compatíveis com os pipelines já homologados.
+**Versão 1.0.1 preparada para publicação** — os nomes, GUIDs e versões major das oito tasks continuam compatíveis com os pipelines já homologados.
 
 | Task | Propósito | Inputs principais |
 | --- | --- | --- |
@@ -111,7 +111,7 @@ Versões precisam de sintaxe explícita: `tag:NOME`, `branch:NOME`, `refs/tags/N
 - O changelog usa o indicador `aheadCount` de `diffs/commits` e consulta o histórico do destino separadamente por `GET /commits`, evitando a comparação com filtro que retornava lista vazia no Azure Repos. Limita a `maxCommits`; agrupa `feat:` e `fix:` e coloca os demais em Other. Uma lista incompleta gera erro; a paginação completa ainda não é suportada.
 - O compare limita resultados a `maxChanges` e inclui indicadores de truncamento.
 - As tasks não executam checkout, merge local nem force-push; GitMerge usa a API de Pull Requests para respeitar branch policies. Um pipeline pode fazer checkout normalmente em etapas separadas.
-- A versão pública da extensão é **1.0.0**. As tasks usam **@1** (Major 1); `GitChangelog` está em **1.0.3** e as demais em **1.0.1**. Mantidos os IDs e contratos existentes.
+- A última versão pública é **1.0.0**; o VSIX **1.0.1** está preparado mas não publicado. As tasks usam **@1** (Major 1); `GitChangelog` está em **1.0.3** e as demais em **1.0.1**. Mantidos os IDs e contratos existentes.
 - A homologação abrangeu tag/branch, verificação de SHA, GitCompare, GitChangelog com múltiplos commits, commit status, PR idempotente, merge real entre branches de teste e identificação automática de Build em Classic Release.
 - Para cada atualização do Marketplace, incremente a versão da extensão; para qualquer alteração de código da task, incremente também sua versão no `task.json`.
 
@@ -141,3 +141,7 @@ MIT License; copyright do autor do repositório. Projeto independente da extens�
 ## GitHub Tags e Releases
 
 A criação de versões é rastreável: [release.yml](.github/workflows/release.yml) obtém o VSIX de um **GitHub Actions aprovado**, valida o commit e cria a tag `vX.Y.Z` e uma **GitHub Release draft** sem declarar publicação antecipada. A [publicação no Marketplace](.github/workflows/publish-marketplace.yml) exige confirmação `PUBLICAR` e um secret `VS_MARKETPLACE_TOKEN` no environment `marketplace-production`. **Somente se o Marketplace aceitar o VSIX**, a release é publicada no GitHub, anexando o mesmo pacote. Se a publicação for manual pelo portal, o workflow `release.yml` permite finalizar a draft com a opção `publish` após informar `PUBLICADO`.
+
+## Licença no VSIX
+
+A partir de **1.0.1**, o arquivo `LICENSE` MIT integra explicitamente o pacote VSIX. O CI verifica a correspondência exata entre o arquivo distribuído e a licença do repositório. Esta correção não muda os GUIDs nem as versões das oito tasks. A atualização do Marketplace permanece separada do build.

@@ -68,6 +68,8 @@ jobs:
               names=set(z.namelist())
               assert 'extension.vsixmanifest' in names
               assert 'extension.vsomanifest' in names
+              assert 'LICENSE' in names, 'MIT LICENSE ausente do VSIX'
+              assert z.read('LICENSE') == open('LICENSE','rb').read(), 'Licença do VSIX divergente'
               for task in ('GitTag','GitBranch','GitCompare','GitChangelog','GitVerify','GitCommitStatus','GitPullRequest','GitMerge'):
                   spec=json.loads(z.read(task+'/task.json'))
                   assert list(spec['execution'])==['Node24']

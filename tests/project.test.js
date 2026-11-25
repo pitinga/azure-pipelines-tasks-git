@@ -17,7 +17,7 @@ test('Every task contributes to Marketplace and is Node24 only',()=>{
  const manifest=require('../vss-extension.json');
  const names=manifest.contributions.map(x=>x.properties.name);
  assert.equal(new Set(names).size,8);
- assert.deepEqual(manifest.files.map(x=>x.path),names);
+ assert.deepEqual(manifest.files.filter(x=>x.path!=='LICENSE').map(x=>x.path),names);
  for(const name of names) {
    const task=require('../tasks/'+name+'/task.json');
    assert.deepEqual(Object.keys(task.execution),['Node24']);
@@ -25,10 +25,10 @@ test('Every task contributes to Marketplace and is Node24 only',()=>{
  }
 });
 
-test('Public 1.0.0 release preserves existing task GUIDs and API majors',()=>{
+test('Git extension preserves existing task GUIDs and API majors',()=>{
  const manifest=require('../vss-extension.json');
  assert.equal(manifest.public,true);
- assert.equal(manifest.version,'1.0.0');
+ assert.equal(manifest.version,'1.0.1');
  assert.equal(require('../package.json').version,'1.0.0');
  assert.equal(manifest.publisher,'pitinga');
  assert.equal(manifest.id,'azure-pipelines-tasks-git');
@@ -64,4 +64,15 @@ test('Tag and draft release are created only from verified CI artifacts',()=>{
  assert.match(wf,/gh release create .*--draft/);
  assert.match(wf,/MARKETPLACE_CONFIRMATION/);
  assert.match(wf,/contents: write/);
+});
+
+
+test('MIT license is included explicitly and protected by VSIX verification',()=>{
+ const m=require('../vss-extension.json');
+ assert.equal(m.content.license.path,'LICENSE');
+ assert.ok(m.files.some(f=>f.path==='LICENSE'&&f.addressable===true));
+ assert.equal(require('../package.json').version,m.version);
+ assert.match(fs.readFileSync(path.join(root,'LICENSE'),'utf8'),/MIT License/);
+ const workflow=fs.readFileSync(path.join(root,'.github/workflows/validate-and-package.yml'),'utf8');
+ assert.match(workflow,/z.read\('LICENSE'\)/);
 });

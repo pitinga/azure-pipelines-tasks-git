@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 1.0.1 — Preparação de correção de licenciamento
+
+- Inclui a licença MIT integral no VSIX e registra o asset de licença no Marketplace.
+- Adiciona validação de integridade da licença nos workflows de build e publicação.
+- Preserva as versões e os identificadores das oito tasks. **Não publicado no Marketplace.**
+
 ## 1.0.0 — Preparação para a primeira publicação pública
 
 - Manifesto da extensão marcado como público e versão de lançamento atualizada.
