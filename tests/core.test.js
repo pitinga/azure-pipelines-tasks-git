@@ -44,7 +44,7 @@ test('task manifests contain 8 unique Node24-only handlers',()=>{
  const manifest=JSON.parse(fs.readFileSync(path.join(ROOT,'vss-extension.json')));
  assert.equal(manifest.publisher,'pitinga');
  assert.equal(manifest.public,true);
- assert.equal(manifest.version,'1.0.1');
+ assert.equal(manifest.version,'1.0.2');
  assert.equal(manifest.contributions.length,8);
 });
 test('validates Git refs including injection and whitespace',()=>{
