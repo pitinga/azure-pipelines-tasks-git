@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 1.0.2 — Nome comercial da extensão
+
+- Renomeia a apresentação para **Git - Tasks for Azure Pipelines** no Marketplace e na documentação.
+- Preserva publisher, extension ID, GUIDs, nomes e versões internas das oito tasks.
+- Sem alterações de comportamento; VSIX preparado para publicação no fluxo controlado.
+
 ## 1.0.1 — Preparação de correção de licenciamento
 
 - Inclui a licença MIT integral no VSIX e registra o asset de licença no Marketplace.

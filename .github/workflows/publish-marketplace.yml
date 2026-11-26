@@ -120,6 +120,6 @@ jobs:
             gh release upload "$tag" "$package" --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
           else
-            gh release create "$tag" "$package" --repo "$GITHUB_REPOSITORY" --target "$sha" --title "Git Tasks $version" --generate-notes --latest
+            gh release create "$tag" "$package" --repo "$GITHUB_REPOSITORY" --target "$sha" --title "Git - Tasks for Azure Pipelines $version" --generate-notes --latest
           fi
           echo "Marketplace publicado e GitHub Release $tag concluida."

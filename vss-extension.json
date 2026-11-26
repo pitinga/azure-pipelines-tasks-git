@@ -2,8 +2,8 @@
   "manifestVersion": 1,
   "id": "azure-pipelines-tasks-git",
   "publisher": "pitinga",
-  "name": "Git Tasks for Azure Pipelines",
-  "version": "1.0.1",
+  "name": "Git - Tasks for Azure Pipelines",
+  "version": "1.0.2",
   "description": "Eight Node.js 24 Git tasks for Azure Repos: tags, branches, diffs, changelogs, verification, commit statuses, pull requests and policy-respecting merges.",
   "public": true,
   "targets": [

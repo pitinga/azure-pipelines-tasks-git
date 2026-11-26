@@ -1,8 +1,8 @@
-# Git Tasks for Azure Pipelines
+# Git - Tasks for Azure Pipelines
 
 Extensão pública Azure DevOps com 8 tasks Azure Repos Git, **Node.js 24 exclusivamente**. Implementação independente, com IDs próprios e licença MIT.
 
-**Versão 1.0.1 preparada para publicação** — os nomes, GUIDs e versões major das oito tasks continuam compatíveis com os pipelines já homologados.
+**Versão 1.0.2 preparada para publicação** — os nomes, GUIDs e versões major das oito tasks continuam compatíveis com os pipelines já homologados.
 
 | Task | Propósito | Inputs principais |
 | --- | --- | --- |
@@ -111,7 +111,7 @@ Versões precisam de sintaxe explícita: `tag:NOME`, `branch:NOME`, `refs/tags/N
 - O changelog usa o indicador `aheadCount` de `diffs/commits` e consulta o histórico do destino separadamente por `GET /commits`, evitando a comparação com filtro que retornava lista vazia no Azure Repos. Limita a `maxCommits`; agrupa `feat:` e `fix:` e coloca os demais em Other. Uma lista incompleta gera erro; a paginação completa ainda não é suportada.
 - O compare limita resultados a `maxChanges` e inclui indicadores de truncamento.
 - As tasks não executam checkout, merge local nem force-push; GitMerge usa a API de Pull Requests para respeitar branch policies. Um pipeline pode fazer checkout normalmente em etapas separadas.
-- A última versão pública é **1.0.0**; o VSIX **1.0.1** está preparado mas não publicado. As tasks usam **@1** (Major 1); `GitChangelog` está em **1.0.3** e as demais em **1.0.1**. Mantidos os IDs e contratos existentes.
+- A última versão pública é **1.0.0**; o VSIX **1.0.2** está preparado mas não publicado. As tasks usam **@1** (Major 1); `GitChangelog` está em **1.0.3** e as demais em **1.0.1**. Mantidos os IDs e contratos existentes.
 - A homologação abrangeu tag/branch, verificação de SHA, GitCompare, GitChangelog com múltiplos commits, commit status, PR idempotente, merge real entre branches de teste e identificação automática de Build em Classic Release.
 - Para cada atualização do Marketplace, incremente a versão da extensão; para qualquer alteração de código da task, incremente também sua versão no `task.json`.
 
@@ -145,3 +145,7 @@ A criação de versões é rastreável: [release.yml](.github/workflows/release.
 ## Licença no VSIX
 
 A partir de **1.0.1**, o arquivo `LICENSE` MIT integra explicitamente o pacote VSIX. O CI verifica a correspondência exata entre o arquivo distribuído e a licença do repositório. Esta correção não muda os GUIDs nem as versões das oito tasks. A atualização do Marketplace permanece separada do build.
+
+## Nome comercial (1.0.2)
+
+O nome público foi atualizado para **Git - Tasks for Azure Pipelines**. A identidade `pitinga.azure-pipelines-tasks-git`, os GUIDs, nomes e majors de todas as tasks permanecem inalterados. A versão 1.0.2 ainda depende do fluxo de aprovação/publicação manual no Marketplace.

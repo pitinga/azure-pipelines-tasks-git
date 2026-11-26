@@ -1,4 +1,4 @@
-# Git Tasks for Azure Pipelines
+# Git - Tasks for Azure Pipelines
 
 **Eight Node.js 24 tasks for Azure Repos Git**, available for Azure Pipelines YAML builds and Classic Releases.
 Create and verify remote Git references, compare versions, generate release notes and manage pull requests. The tasks use Azure DevOps REST APIs; a local Git checkout is not required.
