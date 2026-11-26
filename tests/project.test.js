@@ -43,29 +43,26 @@ test('Git extension preserves existing task GUIDs and API majors',()=>{
  assert.ok(listing.includes('Node.js 24'));
 });
 
-test('Git Tasks Marketplace publication finalizes release only after successful upload',()=>{
+test('Marketplace publication stays manual and does not modify GitHub Releases',()=>{
  const wf=fs.readFileSync(path.join(root,'.github/workflows/publish-marketplace.yml'),'utf8');
- assert.match(wf,/permissions:\n  contents: write/);
- assert.match(wf,/uses: actions\/checkout@v7/);
- assert.match(wf,/uses: actions\/setup-node@v7/);
- assert.match(wf,/node-version: '24'/);
- assert.match(wf,/fetch-depth: 0/);
- const upload=wf.indexOf('      - name: Publish to Marketplace');
- const release=wf.indexOf('      - name: Register tag and final GitHub Release');
- assert.ok(upload>0 && release>upload);
- assert.match(wf.slice(release),/gh release edit .*--draft=false/);
+ assert.match(wf,/workflow_dispatch:/);
  assert.match(wf,/VS_MARKETPLACE_TOKEN/);
+ assert.match(wf,/name: Publish to Marketplace/);
+ assert.doesNotMatch(wf,/gh release (create|edit|upload)/);
 });
-
-test('Tag and draft release are created only from verified CI artifacts',()=>{
- const wf=fs.readFileSync(path.join(root,'.github/workflows/release.yml'),'utf8');
- assert.match(wf,/gh run view .*--json conclusion/);
- assert.match(wf,/gh run download/);
- assert.match(wf,/gh release create .*--draft/);
- assert.match(wf,/MARKETPLACE_CONFIRMATION/);
+test('Public GitHub Release uses approved CI, immutable tags, VSIX and no Marketplace',()=>{
+ const wf=fs.readFileSync(path.join(root,'.github/workflows/github-release.yml'),'utf8');
+ const script=fs.readFileSync(path.join(root,'.github/scripts/github-release.sh'),'utf8');
+ assert.match(wf,/workflow_run:/);
+ assert.match(wf,/Validate and package Git Tasks VSIX/);
  assert.match(wf,/contents: write/);
+ assert.match(script,/gh run download/);
+ assert.match(script,/gh release create/);
+ assert.match(script,/gh release view/);
+ assert.match(script,/Tag .* never move existing tags|never move existing tags/);
+ assert.match(script,/z.read\('LICENSE'\)/);
+ assert.doesNotMatch(script,/extension publish|VS_MARKETPLACE_TOKEN/);
 });
-
 
 test('MIT license is included explicitly and protected by VSIX verification',()=>{
  const m=require('../vss-extension.json');
@@ -84,6 +81,7 @@ test('Marketplace extension name is updated without changing IDs or task majors'
  assert.equal(manifest.publisher,'pitinga');
  assert.equal(manifest.id,'azure-pipelines-tasks-git');
  assert.equal(manifest.version,'1.0.2');
- const workflow=fs.readFileSync(path.join(root,'.github/workflows/publish-marketplace.yml'),'utf8');
- assert.ok(workflow.includes('--title "Git - Tasks for Azure Pipelines $version"'));
+ const workflow=fs.readFileSync(path.join(root,'.github/scripts/github-release.sh'),'utf8');
+ assert.ok(workflow.includes('--title "$name $version"'));
+ assert.match(workflow,/require\('\.\/vss-extension\.json'\)\.name/);
 });
