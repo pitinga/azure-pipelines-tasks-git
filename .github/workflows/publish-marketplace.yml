@@ -83,7 +83,7 @@ jobs:
       - name: Publish to Marketplace
         shell: bash
         env:
-          VS_MARKETPLACE_TOKEN: MARKETPLACE_${{ github.token }}
+          VS_MARKETPLACE_TOKEN: ${{ secrets.VS_MARKETPLACE_TOKEN }}
         run: |
           set -euo pipefail
           if [[ -z "$VS_MARKETPLACE_TOKEN" ]]; then
