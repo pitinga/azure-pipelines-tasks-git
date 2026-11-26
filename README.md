@@ -140,7 +140,7 @@ MIT License; copyright do autor do repositório. Projeto independente da extens�
 
 ## GitHub Tags e Releases
 
-A criação de versões é rastreável: [release.yml](.github/workflows/release.yml) obtém o VSIX de um **GitHub Actions aprovado**, valida o commit e cria a tag `vX.Y.Z` e uma **GitHub Release draft** sem declarar publicação antecipada. A [publicação no Marketplace](.github/workflows/publish-marketplace.yml) exige confirmação `PUBLICAR` e um secret `VS_MARKETPLACE_TOKEN` no environment `marketplace-production`. **Somente se o Marketplace aceitar o VSIX**, a release é publicada no GitHub, anexando o mesmo pacote. Se a publicação for manual pelo portal, o workflow `release.yml` permite finalizar a draft com a opção `publish` após informar `PUBLICADO`.
+A GitHub Release publica e independente do Marketplace: o workflow [github-release.yml](.github/workflows/github-release.yml) valida o CI, verifica o VSIX e cria tag `vX.Y.Z` e release com VSIX. O Marketplace tem workflow manual separado e nao altera essas releases.
 
 ## Licença no VSIX
 
@@ -149,3 +149,7 @@ A partir de **1.0.1**, o arquivo `LICENSE` MIT integra explicitamente o pacote V
 ## Nome comercial (1.0.2)
 
 O nome público foi atualizado para **Git - Tasks for Azure Pipelines**. A identidade `pitinga.azure-pipelines-tasks-git`, os GUIDs, nomes e majors de todas as tasks permanecem inalterados. A versão 1.0.2 ainda depende do fluxo de aprovação/publicação manual no Marketplace.
+
+## GitHub Releases padronizadas
+
+O workflow `.github/workflows/github-release.yml` e independente do Marketplace. Apos CI aprovado na `main`, valida o SHA, a identidade e a licenca do VSIX e publica uma GitHub Release publica (nem draft nem pre-release), com tag `vX.Y.Z` imutavel e VSIX anexado. Reexecucoes preservam releases existentes. O fluxo de Marketplace permanece manual, separado. Historico anterior preservado.

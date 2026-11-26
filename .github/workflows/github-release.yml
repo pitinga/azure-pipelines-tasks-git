@@ -1,0 +1,43 @@
+name: GitHub Release (VSIX)
+on:
+  workflow_run:
+    workflows:
+      - Validate and package Git Tasks VSIX
+      - Build Flyway extension VSIX
+      - Validate and package VSIX
+      - Validate and package Grype + Syft VSIX
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      approved_run_id:
+        description: "Approved CI run ID for current main commit"
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: github-release-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  release:
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+      - name: Publish CI-approved VSIX independently of Marketplace
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPROVED_RUN_ID: ${{ github.event.workflow_run.id || inputs.approved_run_id }}
+        run: bash .github/scripts/github-release.sh
